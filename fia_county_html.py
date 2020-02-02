@@ -23,10 +23,12 @@ state_cd = prep_data.state_config(state_cd,config)
             
 ## Archive old HTMLs
 os.system("""
-install -dvp ${FIA}/html_county/archived-%s
-mv ${FIA}/html_county/*.html ${FIA}/html_county/archived-%s
+## install -dvp ${FIA}/html_county/archived-%s
+## mv ${FIA}/html_county/*.html ${FIA}/html_county/archived-%s
+rm ${PROJ_HOME}/jobid-county*.log
+rm ${FIA}/html_county/*.txt
 rm ${FIA}/job-county-*
-rm ${PROJ_HOME}/jobid-county.log
+rm ${FIA}/*.csv
 """ % (time,time))
 
 ## Create job files to download FIA HTML queries
@@ -34,7 +36,7 @@ for i in state_cd:
     print('************* state:', i, '***************')
     f = open('./fia_sqlite/job-county-%s.sh' % (i,),'w')
     f.write("""#!/bin/bash
-
+    
 #SBATCH --job-name=Download
 #SBATCH --cpus-per-task=2
 #SBATCH --mem=10G
@@ -44,55 +46,16 @@ for i in state_cd:
     for year in config['year']:
         for att_cd in config['attribute_cd']:
             att = attribute['%d' % att_cd]
-            itr = 0
-            n = 8
-            while itr <= n:
-                if itr == 0:
-                    cd_yr = ['%s%s' % (x,year) for x in [state_cd[i]]]
-                    f.write("""
-echo "----------------------- %s -----------------------"
-wget -c --tries=2 --random-wait "https://apps.fs.usda.gov/Evalidator/rest/Evalidator/fullreport?reptype=State&lat=0&lon=0&radius=0&snum=%s&sdenom=No denominator - just produce estimates&wc=%s&pselected=None&rselected=County code and name&cselected=All live stocking&ptime=Current&rtime=Current&ctime=Current&wf=&wnum=&wnumdenom=&FIAorRPA=FIADEF&outputFormat=HTML&estOnly=Y&schemaName=FS_FIADB." -O ${FIA}/html_county/%s_%s_%s_%s.html
-                    """ % (att, att,','.join(cd_yr),att_cd,year,i,year))
-                elif itr % 2 != 0:
-                    yl = year - int(itr/2) - 1
-                    #print(yl)
-                    cd_yr = ['%s%s' % (x,yl) for x in [state_cd[i]]]
-                    f.write("""
-if [ -f ${FIA}/html_county/%s_%s_%s_%s.html ]; then
-if [ $(cat ${FIA}/html_county/%s_%s_%s_%s.html | grep -c %s%s) -le 1 ] || [ $(cat ${FIA}/html_county/%s_%s_%s_%s.html | grep -c '>Total<') -le 1 ]; then
-rm ${FIA}/html_county/%s_%s_%s_%s.html
-wget -c --tries=2 --random-wait "https://apps.fs.usda.gov/Evalidator/rest/Evalidator/fullreport?reptype=State&lat=0&lon=0&radius=0&snum=%s&sdenom=No denominator - just produce estimates&wc=%s&pselected=None&rselected=County code and name&cselected=All live stocking&ptime=Current&rtime=Current&ctime=Current&wf=&wnum=&wnumdenom=&FIAorRPA=FIADEF&outputFormat=HTML&estOnly=Y&schemaName=FS_FIADB." -O ${FIA}/html_county/%s_%s_%s_%s.html
-fi
-fi
-                    """ % (att_cd,year,i,yl+itr, att_cd,year,i,yl+itr, state_cd[i],yl+itr, att_cd,year,i,yl+itr, att_cd,year,i,yl+itr, att,','.join(cd_yr), att_cd,year,i,yl))
-                else:
-                    yh = year + int(itr/2)
-                    #print(yh)
-                    cd_yr = ['%s%s' % (x,yh) for x in [state_cd[i]]]
-                    f.write("""
-if [ -f ${FIA}/html_county/%s_%s_%s_%s.html ]; then
-if [ $(cat ${FIA}/html_county/%s_%s_%s_%s.html | grep -c %s%s) -le 1 ] || [ $(cat ${FIA}/html_county/%s_%s_%s_%s.html | grep -c '>Total<') -le 1 ]; then
-rm ${FIA}/html_county/%s_%s_%s_%s.html
-wget -c --tries=2 --random-wait "https://apps.fs.usda.gov/Evalidator/rest/Evalidator/fullreport?reptype=State&lat=0&lon=0&radius=0&snum=%s&sdenom=No denominator - just produce estimates&wc=%s&pselected=None&rselected=County code and name&cselected=All live stocking&ptime=Current&rtime=Current&ctime=Current&wf=&wnum=&wnumdenom=&FIAorRPA=FIADEF&outputFormat=HTML&estOnly=Y&schemaName=FS_FIADB." -O ${FIA}/html_county/%s_%s_%s_%s.html
-fi
-fi
-                    """ % (att_cd,year,i,yh-itr, att_cd,year,i,yh-itr, state_cd[i],yh-itr, att_cd,year,i,yh-itr, att_cd,year,i,yh-itr, att,','.join(cd_yr), att_cd,year,i,yh))
-                itr += 1
+            cd_yr = ['%s%s' % (x,year) for x in [state_cd[i]]]
             f.write("""
-if [ -f ${FIA}/html_county/%s_%s_%s_%s.html ]; then
-if [ $(cat ${FIA}/html_county/%s_%s_%s_%s.html | grep -c %s%s) -le 1 ] || [ $(cat ${FIA}/html_county/%s_%s_%s_%s.html | grep -c '>Total<') -le 1 ]; then
-rm ${FIA}/html_county/%s_%s_%s_%s.html
-echo "ERROR: the FIA dataset does not include records for state %s between %s-%s"
+echo "----------------------- %s -----------------------"
+wget -c --tries=2 --random-wait "https://apps.fs.usda.gov/Evalidator/rest/Evalidator/fullreport?reptype=State&lat=0&lon=0&radius=0&snum=%s&sdenom=No denominator - just produce estimates&wc=%s&pselected=None&rselected=County code and name&cselected=All live stocking&ptime=Current&rtime=Current&ctime=Current&wf=&wnum=&wnumdenom=&FIAorRPA=FIADEF&outputFormat=HTML&estOnly=Y&schemaName=FS_FIADB." -O ${FIA}/html_county/%s_%s_%s.html
+if [ -f ${FIA}/html_state/%s_%s_%s.html ]; then
+if [ $(cat ${FIA}/html_state/%s_%s_%s.html | grep -c %s%s) -le 1 ] || [ $(cat ${FIA}/html_state/%s_%s_%s.html | grep -c '>Total<') -le 1 ]; then
+rm ${FIA}/html_state/%s_%s_%s.html
 fi
 fi
-
-if [ -f ${FIA}/html_county/%s_%s_%s_%s.html ]; then
-if [ $(cat ${FIA}/html_county/%s_%s_%s_%s.html | grep -c %s%s) -le 1 ] || [ $(cat ${FIA}/html_county/%s_%s_%s_%s.html | grep -c '>Total<') -le 1 ]; then
-rm ${FIA}/html_county/%s_%s_%s_%s.html
-echo "ERROR: the FIA dataset does not include records for state %s between %s-%s"
-fi
-fi
-            """ % (att_cd,year,i,yl, att_cd,year,i,yl, state_cd[i],yl, att_cd,year,i,yl, att_cd,year,i,yl, i,yl,yh, att_cd,year,i,yh, att_cd,year,i,yh, state_cd[i],yh, att_cd,year,i,yh, att_cd,year,i,yh, i,yl,yh))
+            """ % (att, att, ','.join(cd_yr), att_cd,year,i, att_cd,year,i, att_cd,year,i, state_cd[i],year, att_cd,year,i, att_cd,year,i))
     f.close()
     
     ## Send the job file to run
@@ -102,51 +65,61 @@ echo ${JID} >> ${PROJ_HOME}/jobid-county.log
     """ % (i,))
 
 ## Create a Bash file to extract level of attributes from FIA HTML files
-print('************* Obtain level of attributes ***************')
-f = open('./fia_sqlite/job-county-html.sh','w')
-f.write("""#!/bin/bash
+for i in state_cd:
+    print('************* Obtain level of attributes in', i, '***************')
+    f = open('./fia_sqlite/job-county-%s-html.sh' % i, 'w')
+    f.write("""#!/bin/bash
 
 #SBATCH --job-name=Extract
-#SBATCH --cpus-per-task=10
-#SBATCH --mem=60G
+#SBATCH --cpus-per-task=4
+#SBATCH --mem=10G
+#SBATCH --partition=%s
+#SBATCH --time=04:00:00
 
 echo "success: the job has been allocated resources"
 cd ${FIA}/html_county
-rm *.txt
-for i in *.html; do
-cat $i | grep -Po '(?<=nowrap="nowrap">)\d.*(?=<)' | grep -Po '([0-9]*)' >> ./county_cd.txt
-cat $i | grep -Po '(?<=nowrap="nowrap">)\d.*(?=<)' | grep -Po '([A-Z][a-z].*)' >> ./county.txt
-cat $i | grep -Po '(?<=nowrap="nowrap">)\d.*(?=<)' | grep -Po '([A-Z]{2})' >> ./state.txt
-cat $i | grep -P -A 1 '(?<=nowrap="nowrap">)\d.*(?=<)' | grep -Po '(?<=align="right">).*(?=<)' | tr -d , >> ./total.txt
-for l in $(cat $i | grep -Po '(?<=nowrap="nowrap">)\d.*(?=<)' | grep -Po '([0-9]*)'); do echo $i | grep -Po '^\d*(?=_)'; done >> ./att.txt
-for l in $(cat $i | grep -Po '(?<=nowrap="nowrap">)\d.*(?=<)' | grep -Po '([0-9]*)'); do echo $i | grep -Po '(?<=_)\d{4}(?=_)'; done >> ./yr.txt
+for i in *_%s_*.html; do
+cat $i | grep -Po '(?<=nowrap="nowrap">)\d.*(?=<)' | grep -Po '([0-9]*)' >> ./%s_county_cd.txt
+cat $i | grep -Po '(?<=nowrap="nowrap">)\d.*(?=<)' | grep -Po '([A-Z][a-z].*)' >> ./%s_county.txt
+cat $i | grep -Po '(?<=nowrap="nowrap">)\d.*(?=<)' | grep -Po '([A-Z]{2})' >> ./%s_state.txt
+cat $i | grep -P -A 1 '(?<=nowrap="nowrap">)\d.*(?=<)' | grep -Po '(?<=align="right">).*(?=<)' | tr -d , >> ./%s_total.txt
+for l in $(cat $i | grep -Po '(?<=nowrap="nowrap">)\d.*(?=<)' | grep -Po '([0-9]*)'); do echo $i | grep -Po '^\d*(?=_)'; done >> ./%s_att.txt
+for l in $(cat $i | grep -Po '(?<=nowrap="nowrap">)\d.*(?=<)' | grep -Po '([0-9]*)'); do echo $i | grep -Po '(?<=_)\d{4}(?=_)'; done >> ./%s_yr.txt
 done
 
-paste -d _ att.txt yr.txt > ./att_yr.txt
-paste -d , county_cd.txt county.txt state.txt yr.txt att_yr.txt total.txt > ${FIA}/att_level_county.csv
+paste -d _ %s_att.txt %s_yr.txt > ./%s_att_yr.txt
+paste -d , %s_county_cd.txt %s_county.txt %s_state.txt %s_yr.txt %s_att_yr.txt %s_total.txt > ${FIA}/att_level_county_%s.csv
 
 cd ${PROJ_HOME}
-""")
-f.close()
-
-## Send the job file to run
-os.system("""
-sleep 10
+    """ % ((config['partition'],) + (i,) * 17))
+    f.close()
+    
+    ## Send the job file to run
+    os.system("""
+sleep 5
 JOBID=$(cat ${PROJ_HOME}/jobid-county.log | tr '\n' ',' | grep -Po '.*(?=,)')
-JID=$(sbatch --parsable --dependency=afterok:$(echo ${JOBID}) ${FIA}/job-county-html.sh)
-echo ${JID} > ${PROJ_HOME}/jobid-county.log
-""")
+JID2=$(sbatch --parsable --dependency=afterok:$(echo ${JOBID}) ${FIA}/job-county-%s-html.sh)
+echo ${JID2} >> ${PROJ_HOME}/jobid-county-2.log 
+    """ % (i,))
 
 ## Create a dictionary of FIA attribute levels for each county
 f = open('./job_county.py','w')
 f.write("""#!/usr/bin/python3
 
 import re
+import os
 import sys
 import csv
 import json
 import prep_data
 import collections
+
+os.system(''' 
+cd ${FIA}
+for i in att_level_*.csv; do
+cat $i >> att_level_county.csv
+done
+''')
 
 config = json.load(open(sys.argv[1]))
 with open('./fia_sqlite/att_level_county.csv', 'r') as att:
@@ -201,7 +174,8 @@ f.close()
 ## Send the last job to run
 os.system("""
 sleep 5
-JID=$(sbatch --parsable --dependency=afterok:$(cat ${PROJ_HOME}/jobid-county.log) ${PROJ_HOME}/job_county.sh)
-echo ${JID} > ${PROJ_HOME}/jobid-county.log
-sleep 5
+JOBID2=$(cat ${PROJ_HOME}/jobid-county-2.log | tr '\n' ',' | grep -Po '.*(?=,)') 
+JID3=$(sbatch --parsable --dependency=afterok:$(echo ${JOBID2}) ${PROJ_HOME}/job_county.sh)
+echo ${JID3} > ${PROJ_HOME}/jobid-county-3.log
+sleep 2
 """)
