@@ -113,17 +113,3 @@ if __name__=='__main__':
     ## FIA state codes
     with open('./state_codes.csv', 'r') as cd:
         state_cd = csv_dict(cd)
-    
-    ## State neighbors and codes
-    with open('./neighbor_state.csv', 'r') as nd:
-        ne_data = csv_list_tuple(nd) 
-    
-    neighbor_state = collections.defaultdict(list)
-    for i,j in ne_data:
-        neighbor_state[i].append(j)
-        neighbor_state[j].append(i)
-    
-    neighbor_cd = collections.defaultdict(list)
-    for i,j in ne_data:
-        neighbor_cd[i].append(state_cd[j])
-        neighbor_cd[j].append(state_cd[i])
