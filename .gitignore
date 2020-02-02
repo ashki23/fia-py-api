@@ -4,6 +4,7 @@ other_data/
 fia_sqlite/
 outputs/
 job_*
+*.json
 *.csv
 *.out
 *.log
