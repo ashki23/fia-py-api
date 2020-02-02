@@ -78,7 +78,7 @@ for i in state_cd:
 
 echo "success: the job has been allocated resources"
 cd ${FIA}/html_county
-for i in *_%s_*.html; do
+for i in *%s*.html; do
 cat $i | grep -Po '(?<=nowrap="nowrap">)\d.*(?=<)' | grep -Po '([0-9]*)' >> ./%s_county_cd.txt
 cat $i | grep -Po '(?<=nowrap="nowrap">)\d.*(?=<)' | grep -Po '([A-Z][a-z].*)' >> ./%s_county.txt
 cat $i | grep -Po '(?<=nowrap="nowrap">)\d.*(?=<)' | grep -Po '([A-Z]{2})' >> ./%s_state.txt
