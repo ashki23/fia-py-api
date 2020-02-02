@@ -96,7 +96,7 @@ cd ${PROJ_HOME}
     
     ## Send the job file to run
     os.system("""
-sleep 5
+sleep 1
 JOBID=$(cat ${PROJ_HOME}/jobid-county.log | tr '\n' ',' | grep -Po '.*(?=,)')
 JID2=$(sbatch --parsable --dependency=afterok:$(echo ${JOBID}) ${FIA}/job-county-%s-html.sh)
 echo ${JID2} >> ${PROJ_HOME}/jobid-county-2.log 
@@ -177,5 +177,5 @@ sleep 5
 JOBID2=$(cat ${PROJ_HOME}/jobid-county-2.log | tr '\n' ',' | grep -Po '.*(?=,)') 
 JID3=$(sbatch --parsable --dependency=afterok:$(echo ${JOBID2}) ${PROJ_HOME}/job_county.sh)
 echo ${JID3} > ${PROJ_HOME}/jobid-county-3.log
-sleep 2
+sleep 1
 """)
