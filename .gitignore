@@ -1,0 +1,11 @@
+*_env/
+__pycache__/
+other_data/
+fia_sqlite/
+outputs/
+job_*
+*.csv
+*.out
+*.log
+*.pdf
+*.html
