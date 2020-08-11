@@ -1,8 +1,8 @@
 #!/bin/bash
 
 #SBATCH --job-name=WoodyBiomass
-#SBATCH --cpus-per-task=10
-#SBATCH --mem=60G
+#SBATCH --cpus-per-task=1
+#SBATCH --mem=4G
 
 echo ============= Local environment ============ $(hostname) $(date)
 

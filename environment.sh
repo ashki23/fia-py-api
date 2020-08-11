@@ -1,8 +1,8 @@
 #!/bin/bash
 
 #SBATCH --job-name=Environment
-#SBATCH --cpus-per-task=10
-#SBATCH --mem=60G
+#SBATCH --cpus-per-task=2
+#SBATCH --mem=32G
 
 export PROJ_HOME=${PWD}
 export OUTPUT=${PWD}/outputs
@@ -22,9 +22,8 @@ fi
 
 ## Uncomment the following to remove the local virtual env
 # source deactivate
-# conda clean --yes --all
 # conda env remove --yes --prefix ./app_py_env
-# rm -r ./app_py_env
+# conda clean --yes --all
 
 echo -------------------------------------------- $(hostname) $(date)
 
@@ -35,6 +34,6 @@ fi
 
 ## Activate and update the local env
 source activate ./app_py_env
-conda update --yes python xlrd shapely fiona
+# conda update --yes python xlrd shapely fiona
 
 echo -------------------------------------------- $(hostname) $(date)

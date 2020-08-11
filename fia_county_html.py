@@ -38,8 +38,8 @@ for i in state_cd:
     f.write("""#!/bin/bash
     
 #SBATCH --job-name=Download
-#SBATCH --cpus-per-task=2
-#SBATCH --mem=10G
+#SBATCH --cpus-per-task=1
+#SBATCH --mem=1G
 #SBATCH --partition=%s
 #SBATCH --time=04:00:00
     """ % config['partition'])
@@ -71,8 +71,8 @@ for i in state_cd:
     f.write("""#!/bin/bash
 
 #SBATCH --job-name=Extract
-#SBATCH --cpus-per-task=4
-#SBATCH --mem=10G
+#SBATCH --cpus-per-task=2
+#SBATCH --mem=8G
 #SBATCH --partition=%s
 #SBATCH --time=04:00:00
 
@@ -164,8 +164,8 @@ f = open('./job_county.sh','w')
 f.write("""#!/bin/bash
 
 #SBATCH --job-name=Output
-#SBATCH --cpus-per-task=10
-#SBATCH --mem=60G
+#SBATCH --cpus-per-task=2
+#SBATCH --mem=8G
 
 srun python3 job_county.py config.json
 """)
