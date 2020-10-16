@@ -71,10 +71,7 @@ for i in state_cd:
     f.write("""#!/bin/bash
 
 #SBATCH --job-name=Extract
-#SBATCH --cpus-per-task=2
 #SBATCH --mem=8G
-#SBATCH --partition=%s
-#SBATCH --time=04:00:00
 
 echo "success: the job has been allocated resources"
 cd ${FIA}/html_county
@@ -164,10 +161,9 @@ f = open('./job_county.sh','w')
 f.write("""#!/bin/bash
 
 #SBATCH --job-name=Output
-#SBATCH --cpus-per-task=2
-#SBATCH --mem=8G
+#SBATCH --mem=2G
 
-srun python3 job_county.py config.json
+python3 job_county.py config.json
 """)
 f.close()
 
