@@ -1,39 +1,35 @@
 #!/bin/bash
 
-#SBATCH --job-name=Environment
-#SBATCH --cpus-per-task=2
-#SBATCH --mem=32G
-
 export PROJ_HOME=${PWD}
 export OUTPUT=${PWD}/outputs
-export OTHER=${PWD}/other_data
-export FIA=${PWD}/fia_sqlite
+export FIA=${PWD}/fia_data
 install -dvp ${OUTPUT}
-install -dvp ${OTHER}
 install -dvp ${FIA}/html_county
+install -dvp ${FIA}/html_state
+install -dvp ${FIA}/html_coordinate
+MYHOME=${HOME}
 
-## Load Miniconda
-if [ -d spack ]; then
-source bootstrap.sh; else 
-export CONDA_PKGS_DIRS=~/.conda/pkgs
-export CONDA_ENVS_PATH=~/.conda/envs
-module load miniconda3
+## Install Miniconda
+if [ ! -d miniconda ]; then
+source bootstrap.sh
 fi
 
-## Uncomment the following to remove the local virtual env
-# source deactivate
-# conda env remove --yes --prefix ./app_py_env
-# conda clean --yes --all
+## Initiate conda
+export HOME=${PROJ_HOME}
+export PATH=${PROJ_HOME}/miniconda/bin/:${PATH}
+source ./miniconda/etc/profile.d/conda.sh
 
-echo -------------------------------------------- $(hostname) $(date)
+## Deactivat active envs
+conda deactivate
 
-## Create local environment
-if [ ! -d app_py_env ]; then
-conda create --yes --prefix ./app_py_env python xlrd shapely fiona
+echo ============ Create Conda envs ============= $(hostname) $(date)
+
+## Create local environments
+if [ ! -d api_py_env ]; then
+## Including: python openpyxl xlrd jq
+conda create --yes --prefix ./api_py_env --file ./api-py-env.txt
 fi
 
-## Activate and update the local env
-source activate ./app_py_env
-# conda update --yes python xlrd shapely fiona
-
-echo -------------------------------------------- $(hostname) $(date)
+## Activate and update Python environment
+conda activate ./api_py_env
+export HOME=${MYHOME}

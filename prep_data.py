@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python
 
 import sys
 import csv
@@ -90,7 +90,7 @@ if __name__=='__main__':
     year = config['year']
     
     ## FIA attributes
-    with open('./other_data/attributes_all.csv', 'r') as att:
+    with open('./attributes_all.csv', 'r') as att:
         cd_att_all = csv_list_dict(att)
     
     ## FIA attributes number and name
@@ -98,18 +98,43 @@ if __name__=='__main__':
     for atr in cd_att_all:
         cd_att[atr['attribute_nbr']] = atr['attribute_descr']
     
-    ### Uncomment to read FIA attributes number and name directly
-    # with open('./attributes_all.csv', 'r') as att:
-    #     cd_att = csv_dict(att)
-    
     ## JSON and CSV outputs of selected FIA attributes (number and name)
     att_select = select_att_config(cd_att,config)
-    with open('attributes.json', 'w') as atj:
+    with open('./attributes.json', 'w') as atj:
         json.dump(att_select, atj) 
     
-    with open('attributes.csv', 'w') as atc:
+    with open('./attributes.csv', 'w') as atc:
         dict_csv(att_select,atc)
     
     ## FIA state codes
     with open('./state_codes.csv', 'r') as cd:
         state_cd = csv_dict(cd)
+
+    ## State neighbors and codes
+    with open('./neighbor_state.csv', 'r') as nd:
+        ne_data = csv_list_tuple(nd) 
+    
+    neighbor_state = collections.defaultdict(list)
+    for i,j in ne_data:
+        neighbor_state[i].append(j)
+        neighbor_state[j].append(i)
+    
+    neighbor_cd = collections.defaultdict(list)
+    for i,j in ne_data:
+        neighbor_cd[i].append(state_cd[j])
+        neighbor_cd[j].append(state_cd[i])
+    
+    ## Coordinates
+    if "coordinate" in config['query_type']:
+        with open('./coordinates.csv', 'r') as xy:
+            xydata = csv_list_dict(xy)
+        
+        for p in xydata:
+            p['unit_id'] = (str(p['lat']).replace('.','') + str(p['lon']).replace('.','').replace('-',''))[:8]
+            p['state_cd'] = state_cd[p['state']]
+            p['neighbors'] =  neighbor_state[p['state']]
+            p['neighbors_cd'] =  neighbor_cd[p['state']]
+    
+        ### JSON output of coordinates
+        with open('./coordinates.json', 'w') as fj:
+            json.dump(xydata,fj)
