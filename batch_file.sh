@@ -25,6 +25,7 @@ elif jq ."query_type" config.json | grep -q "coordinate"; then
 	python3 fia_coordinate.py config.json attributes.json coordinates.json
     else
 	"Please add place coordinates in this directrory. Acceptable file format is CSV and the file name should be 'coordinates.csv'"
+    fi
 else
     echo "Please select one of the available methods for 'query_type'. Available methods are 'state', 'county', 'coordinate'"
 fi
