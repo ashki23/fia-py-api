@@ -26,8 +26,10 @@ echo ============ Create Conda envs ============= $(hostname) $(date)
 
 ## Create local environments
 if [ ! -d api_py_env ]; then
-## Including: python openpyxl xlrd jq
+## Including: python openpyxl xlrd jq geocoder
 conda create --yes --prefix ./api_py_env --file ./api-py-env.txt
+conda activate ./api_py_env
+pip install geocoder
 fi
 
 ## Activate and update Python environment

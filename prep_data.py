@@ -4,6 +4,7 @@ import sys
 import csv
 import json
 import xlrd
+import geocoder
 import collections
 
 def csv_dict(csv_file):
@@ -133,9 +134,12 @@ if __name__=='__main__':
     with open('./attributes.csv', 'w') as atc:
         dict_csv(att_select,atc)
     
-    ## FIA state codes
+    ## Census state codes
     with open('./state_codes.csv', 'r') as cd:
         state_cd = csv_dict(cd)
+    
+    with open('./state_abb.csv', 'r') as ab:
+        state_abb = csv_dict(ab)
 
     ## State neighbors and codes
     with open('./neighbor_state.csv', 'r') as nd:
@@ -157,10 +161,12 @@ if __name__=='__main__':
             xydata = csv_list_dict(xy)
 
         header = xydata[0].keys()
-        assert all(x in header for x in ['lat','lon','state','radius']), "Error: 'coordinate.csv' does not include required filds, 'lat', 'lon', 'state', and 'radius'."
+        assert all(x in header for x in ['lat','lon','radius']), "Error: 'coordinate.csv' does not include required filds, 'lat', 'lon', and 'radius'."
         
         for p in xydata:
             p['unit_id'] = (str(p['lat']).replace('.','') + str(p['lon']).replace('.','').replace('-',''))[:8]
+            p['state_name'] = geocoder.osm(f"{str(p['lat'])}, {str(p['lon'])}", reverse = True).json['state']
+            p['state'] = state_abb[p['state_name']]
             p['state_cd'] = state_cd[p['state']]
             p['neighbors'] =  neighbor_state[p['state']]
             p['neighbors_cd'] =  neighbor_cd[p['state']]
