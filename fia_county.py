@@ -44,43 +44,44 @@ for i in state_cd:
 #SBATCH --partition=%s
 #SBATCH --time=04:00:00
     """ % config['partition'])
-    for att_cd in config['attribute_cd']:
-        att = attribute['%d' % att_cd]
-        itr = 0
-        n = 4
-        while itr <= n:
-            if itr == 0:
-                cd_yr = ['%s%s' % (x,year) for x in [state_cd[i]]]
-                f.write("""
+    for year in config['year']:
+        for att_cd in config['attribute_cd']:
+            att = attribute['%d' % att_cd]
+            itr = 0
+            n = 4
+            while itr <= n:
+                if itr == 0:
+                    cd_yr = ['%s%s' % (x,year) for x in [state_cd[i]]]
+                    f.write("""
 echo "---------------- %s - %s - %s"
 wget -c --tries=2 --random-wait "https://apps.fs.usda.gov/Evalidator/rest/Evalidator/fullreport?reptype=State&lat=0&lon=0&radius=0&snum=%s&sdenom=No denominator - just produce estimates&wc=%s&pselected=None&rselected=County code and name&cselected=All live stocking&ptime=Current&rtime=Current&ctime=Current&wf=&wnum=&wnumdenom=&FIAorRPA=FIADEF&outputFormat=HTML&estOnly=Y&schemaName=FS_FIADB." -O ${FIA}/html_county/%s_%s_%s_%s.html
-                """ % (year,i,att,att,','.join(cd_yr),att_cd,year,i,year))
-            elif itr % 2 != 0:
-                yl = year - int(itr/2) - 1
-                #print(yl)
-                cd_yr = ['%s%s' % (x,yl) for x in [state_cd[i]]]
-                f.write("""
+                    """ % (year,i,att,att,','.join(cd_yr),att_cd,year,i,year))
+                elif itr % 2 != 0:
+                    yl = year - int(itr/2) - 1
+                    #print(yl)
+                    cd_yr = ['%s%s' % (x,yl) for x in [state_cd[i]]]
+                    f.write("""
 if [ -f ${FIA}/html_county/%s_%s_%s_%s.html ]; then
 if [ $(cat ${FIA}/html_county/%s_%s_%s_%s.html | grep -c %s%s) -le 1 ] || [ $(cat ${FIA}/html_county/%s_%s_%s_%s.html | grep -c '>Total<') -le 1 ]; then
 rm ${FIA}/html_county/%s_%s_%s_%s.html
 wget -c --tries=2 --random-wait "https://apps.fs.usda.gov/Evalidator/rest/Evalidator/fullreport?reptype=State&lat=0&lon=0&radius=0&snum=%s&sdenom=No denominator - just produce estimates&wc=%s&pselected=None&rselected=County code and name&cselected=All live stocking&ptime=Current&rtime=Current&ctime=Current&wf=&wnum=&wnumdenom=&FIAorRPA=FIADEF&outputFormat=HTML&estOnly=Y&schemaName=FS_FIADB." -O ${FIA}/html_county/%s_%s_%s_%s.html
 fi
 fi
-                """ % (att_cd,year,i,yl+itr, att_cd,year,i,yl+itr, state_cd[i],yl+itr, att_cd,year,i,yl+itr, att_cd,year,i,yl+itr, att,','.join(cd_yr), att_cd,year,i,yl))
-            else:
-                yh = year + int(itr/2)
-                #print(yh)
-                cd_yr = ['%s%s' % (x,yh) for x in [state_cd[i]]]
-                f.write("""
+                    """ % (att_cd,year,i,yl+itr, att_cd,year,i,yl+itr, state_cd[i],yl+itr, att_cd,year,i,yl+itr, att_cd,year,i,yl+itr, att,','.join(cd_yr), att_cd,year,i,yl))
+                else:
+                    yh = year + int(itr/2)
+                    #print(yh)
+                    cd_yr = ['%s%s' % (x,yh) for x in [state_cd[i]]]
+                    f.write("""
 if [ -f ${FIA}/html_county/%s_%s_%s_%s.html ]; then
 if [ $(cat ${FIA}/html_county/%s_%s_%s_%s.html | grep -c %s%s) -le 1 ] || [ $(cat ${FIA}/html_county/%s_%s_%s_%s.html | grep -c '>Total<') -le 1 ]; then
 rm ${FIA}/html_county/%s_%s_%s_%s.html
 wget -c --tries=2 --random-wait "https://apps.fs.usda.gov/Evalidator/rest/Evalidator/fullreport?reptype=State&lat=0&lon=0&radius=0&snum=%s&sdenom=No denominator - just produce estimates&wc=%s&pselected=None&rselected=County code and name&cselected=All live stocking&ptime=Current&rtime=Current&ctime=Current&wf=&wnum=&wnumdenom=&FIAorRPA=FIADEF&outputFormat=HTML&estOnly=Y&schemaName=FS_FIADB." -O ${FIA}/html_county/%s_%s_%s_%s.html
 fi
 fi
-                """ % (att_cd,year,i,yh-itr, att_cd,year,i,yh-itr, state_cd[i],yh-itr, att_cd,year,i,yh-itr, att_cd,year,i,yh-itr, att,','.join(cd_yr), att_cd,year,i,yh))
-            itr += 1
-        f.write("""
+                    """ % (att_cd,year,i,yh-itr, att_cd,year,i,yh-itr, state_cd[i],yh-itr, att_cd,year,i,yh-itr, att_cd,year,i,yh-itr, att,','.join(cd_yr), att_cd,year,i,yh))
+                itr += 1
+            f.write("""
 if [ -f ${FIA}/html_county/%s_%s_%s_%s.html ]; then
 if [ $(cat ${FIA}/html_county/%s_%s_%s_%s.html | grep -c %s%s) -le 1 ] || [ $(cat ${FIA}/html_county/%s_%s_%s_%s.html | grep -c '>Total<') -le 1 ]; then
 rm ${FIA}/html_county/%s_%s_%s_%s.html
@@ -94,7 +95,7 @@ rm ${FIA}/html_county/%s_%s_%s_%s.html
 echo "ERROR: the FIA dataset does not include records for %s for state %s between %s-%s"
 fi
 fi
-        """ % (att_cd,year,i,yl, att_cd,year,i,yl, state_cd[i],yl, att_cd,year,i,yl, att_cd,year,i,yl, att,i,yl,yh, att_cd,year,i,yh, att_cd,year,i,yh, state_cd[i],yh, att_cd,year,i,yh, att_cd,year,i,yh, att,i,yl,yh))
+            """ % (att_cd,year,i,yl, att_cd,year,i,yl, state_cd[i],yl, att_cd,year,i,yl, att_cd,year,i,yl, att,i,yl,yh, att_cd,year,i,yh, att_cd,year,i,yh, state_cd[i],yh, att_cd,year,i,yh, att_cd,year,i,yh, att,i,yl,yh))
     f.close()
     
     ## Send the job file to run
