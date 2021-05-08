@@ -1,7 +1,8 @@
 {
-    "year" : [2017,2018,2019],
-    "state": ["GA","MO","NY"],
-    "attribute_cd": [7,8,9],
+    "year" : [2017,2019],
+    "state": ["AL","LA"],
+    "attribute_cd": [7,8],
+    "tolerance": 1,
     "job_number_max": 100,
     "time_hr_max": 24,
     "partition": "General",

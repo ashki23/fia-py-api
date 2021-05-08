@@ -6,6 +6,7 @@ fia_data/
 outputs/
 miniconda/
 .conda/
+.cache/
 .ipynb_checkpoints/
 Miniconda3-latest-Linux-x86_64.sh
 job_coord*
@@ -13,6 +14,7 @@ job_state.*
 job_county.*
 env_short.sh
 cleaner.sh
+state.txt
 *.json
 *.csv
 *.out
