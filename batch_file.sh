@@ -28,10 +28,10 @@ if jq ."query_type" config.json | grep -q "coordinate"; then
     if [ -f coordinates.json ]; then
 	python3 fia_coordinate.py config.json attributes.json coordinates.json
     else
-	"Please add place coordinates in this directrory. Acceptable file format is CSV and the file name should be 'coordinates.csv'"
+	echo "Please place the coordinates in "$PWD". Acceptable file format is CSV and the file name should be 'coordinates.csv.'"
     fi
 fi
 
 if ! jq ."query_type" config.json | grep -Pq "state|county|coordinate"; then
-    echo "Please select one of the available methods for 'query_type'. Available methods are 'state', 'county', 'coordinate'"
+    echo "Please select one of the available methods for 'query_type'. Available methods are 'state', 'county', 'coordinate'."
 fi

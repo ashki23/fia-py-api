@@ -181,7 +181,7 @@ with open('./outputs/state-%s.json', 'w') as fj:
     json.dump(state_data, fj)
 
 ## Panel CSV output
-with open('./outputs/panel-state-%s.csv', 'w') as fp:
+with open('./outputs/state-%s.csv', 'w') as fp:
     prep_data.list_dict_panel(state_data,state_keys[:lk],config,fp)
 
 """ % ('%s','%s','%',time,time))
