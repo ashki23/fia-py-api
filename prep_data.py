@@ -34,13 +34,24 @@ def csv_list_dict(csv_file):
         list_dict.append(mm)
     return list_dict
 
+def select_state_config(list_dict,config):
+    if config['state'] == ['ALL']:
+        return list_dict
+    else:
+        select = []
+        for k in list_dict:
+            if k['state'] in config['state']:
+                select.append(k)
+        return select
+
 def state_config(dict_file,config):
     if config['state'] == ['ALL']:
         return dict_file
     else:
-        select = {}
-        for st in config:
-            select[st] = dict_file[st]
+        select = dict_file.copy()
+        for scd in dict_file:
+            if scd not in config['state']:
+                del select[scd]
         return select
 
 def select_att_config(dict_,config):
@@ -48,6 +59,18 @@ def select_att_config(dict_,config):
     for i in config['attribute_cd']:
         select[str(i)] = dict_[str(i)]
     return select
+
+def select_uniq_id(list_dict,id_name):
+    id_list = []
+    for k in list_dict:
+        id_list.append(k[id_name])
+    id_list = list(set(id_list))
+    uniq = []
+    for j in list_dict:
+        if j[id_name] in id_list:
+            uniq.append(j)
+            id_list.remove(j[id_name])
+    return uniq
 
 def dict_csv(dict_data,csv_output):
     fcsv = csv.writer(csv_output)
@@ -82,7 +105,11 @@ def list_dict_panel(list_dict,keys,config,csv_output):
         for y in config['year']:
             att_yr = []
             att_yr.extend(['%s_%s' % (x,y) for x in config['attribute_cd']])
+            for ay in att_yr:
+                if ay not in i.keys():
+                    i[ay] = 'NA'
             fcsv.writerow(row + [y] + [i[x] for x in att_yr])
+
 
 if __name__=='__main__':
     ## Read config
