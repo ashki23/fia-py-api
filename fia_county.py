@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python
 
 import os
 import sys
@@ -47,7 +47,7 @@ for i in state_cd:
     for att_cd in config['attribute_cd']:
         att = attribute['%d' % att_cd]
         itr = 0
-        n = 8
+        n = 4
         while itr <= n:
             if itr == 0:
                 cd_yr = ['%s%s' % (x,year) for x in [state_cd[i]]]
@@ -146,7 +146,7 @@ fi
 
 ## Create a dictionary of FIA attribute levels for each county
 f = open('./job_county.py','w')
-f.write("""#!/usr/bin/python3
+f.write("""#!/usr/bin/env python
 
 import re
 import sys

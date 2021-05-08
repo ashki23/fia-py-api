@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python
 
 import os
 import sys
@@ -46,7 +46,7 @@ for i in state_cd:
         for att_cd in config['attribute_cd']:
             att = attribute['%d' % att_cd]
             itr = 0
-            n = 8
+            n = 4
             while itr <= n:
                 if itr == 0:
                     cd_yr = ['%s%s' % (x,year) for x in [state_cd[i]]]
@@ -101,7 +101,7 @@ fi
     os.system("""
 if [ %d -gt 1 ]; then
 JID=$(sbatch --parsable ${FIA}/job-state-%s.sh)
-echo ${JID} >> ${PROJ_HOME}/jobid-state.log 
+echo ${JID} >> ${PROJ_HOME}/jobid-state.log
 else . ${FIA}/job-state-%s.sh >> ${PROJ_HOME}/serial_download_log.out
 fi
     """ % (maxj,i,i))
@@ -144,7 +144,7 @@ fi
 
 ## Create a dictionary of FIA attribute levels for each state
 f = open('./job_state.py','w')
-f.write("""#!/usr/bin/python3
+f.write("""#!/usr/bin/env python
 
 import re
 import sys
@@ -182,7 +182,7 @@ with open('./outputs/state-%s.json', 'w') as fj:
 
 ## Panel CSV output
 with open('./outputs/panel-state-%s.csv', 'w') as fp:
-    prep_data.list_dict_panel_att(state_data,state_keys[:lk],config,fp)
+    prep_data.list_dict_panel(state_data,state_keys[:lk],config,fp)
 
 """ % ('%s','%s','%',time,time))
 f.close()
