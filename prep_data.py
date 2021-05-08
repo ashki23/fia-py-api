@@ -155,13 +155,16 @@ if __name__=='__main__':
     if "coordinate" in config['query_type']:
         with open('./coordinates.csv', 'r') as xy:
             xydata = csv_list_dict(xy)
+
+        header = xydata[0].keys()
+        assert all(x in ['lat','lon','state','radius'] for x in header), "Error: 'coordinate.csv' does not include required filds, 'lat', 'lon', 'state', and 'radius'."
         
         for p in xydata:
             p['unit_id'] = (str(p['lat']).replace('.','') + str(p['lon']).replace('.','').replace('-',''))[:8]
             p['state_cd'] = state_cd[p['state']]
             p['neighbors'] =  neighbor_state[p['state']]
             p['neighbors_cd'] =  neighbor_cd[p['state']]
-    
+        
         ### JSON output of coordinates
         with open('./coordinates.json', 'w') as fj:
             json.dump(xydata,fj)

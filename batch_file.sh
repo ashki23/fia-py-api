@@ -11,7 +11,7 @@ source environment.sh
 echo ================ Preparations =============== $(hostname) $(date)
 
 source download.sh
-python3 prep_data.py config.json
+python3 prep_data.py config.json || return;
 
 echo ================ HTML queries =============== $(hostname) $(date)
 
