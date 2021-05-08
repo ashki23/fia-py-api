@@ -158,11 +158,6 @@ import collections
 config = json.load(open(sys.argv[1]))
 coordinate_data = json.load(open(sys.argv[2]))
 
-keys = list(coordinate_data[0].keys())
-lk = len(keys)
-for x in config['attribute_cd']:
-    keys.extend(['%s_%s' %s (x,y) for y in config['year']])
-
 ## Read level of attributes from CSV
 with open('./fia_data/att_level_coordinate.csv', 'r') as att:
     att_data = att.readlines()
@@ -187,11 +182,18 @@ for l in coordinate_data:
 with open('./outputs/coordinate-%s.json', 'w') as fj:
     json.dump(coordinate_data, fj)
 
-## Panel CSV output
-with open('./outputs/panel-coordinate-%s.csv', 'w') as fp:
-    prep_data.list_dict_panel(coordinate_data,keys[:lk],config,fp)
+## CSV output
+keys = list(coordinate_data[0].keys())
+with open('./outputs/coordinate-panel-%s.csv', 'w') as fp:
+    prep_data.list_dict_panel(coordinate_data,keys,config,fp)
 
-""" % ('%s','%s','%',time,time))
+for x in config['attribute_cd']:
+    keys.extend(['%s_%s' %s (x,y) for y in config['year']])
+
+with open('./outputs/coordinate-%s.csv', 'w') as fc:
+    prep_data.list_dict_csv(coordinate_data,keys,fc)
+
+""" % (time,time,'%s','%s','%',time))
 f.close()
 
 ## Create a job file
@@ -201,7 +203,7 @@ f.write("""#!/bin/bash
 #SBATCH --job-name=Output
 #SBATCH --mem=8G
 
-python3 job_coordinate.py config.json coordinate_data.json
+python3 job_coordinate.py config.json coordinates.json
 """)
 f.close()
 

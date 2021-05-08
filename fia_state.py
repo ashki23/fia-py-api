@@ -177,7 +177,7 @@ with open('./outputs/state-%s.json', 'w') as fj:
 
 ## CSV output
 state_keys = ['state']
-with open('./outputs/state-%s-panel.csv', 'w') as fp:
+with open('./outputs/state-panel-%s.csv', 'w') as fp:
     prep_data.list_dict_panel(state_data,state_keys,config,fp)
 
 for x in config['attribute_cd']:

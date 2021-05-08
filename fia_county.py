@@ -180,8 +180,8 @@ with open('./outputs/county-%s.json', 'w') as fj:
 
 ## CSV output
 county_keys = ['county_cd','county','state']
-with open('./outputs/county-%s-panel.csv', 'w') as fp:
-    prep_data.list_dict_panel(county_data,county_keys,fp)
+with open('./outputs/county-panel-%s.csv', 'w') as fp:
+    prep_data.list_dict_panel(county_data,county_keys,config,fp)
 
 for x in config['attribute_cd']:
     county_keys.extend(['%s_%s' %s (x,y) for y in config['year']])
