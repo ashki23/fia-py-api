@@ -157,11 +157,6 @@ config = json.load(open(sys.argv[1]))
 with open('./fia_data/att_level_state.csv', 'r') as att:
     att_data_state = att.readlines()
 
-state_keys = ['state']
-lk = len(state_keys)
-for x in config['attribute_cd']:
-    state_keys.extend(['%s_%s' %s (x,y) for y in config['year']])
-
 ## Convert CSV to ListDict with RE
 pattern = re.compile('(.*)[,]' * 3 + '(.*)')
 state_data_dict = collections.defaultdict(dict)
@@ -180,11 +175,18 @@ for d in state_data_dict:
 with open('./outputs/state-%s.json', 'w') as fj:
     json.dump(state_data, fj)
 
-## Panel CSV output
-with open('./outputs/state-%s.csv', 'w') as fp:
-    prep_data.list_dict_panel(state_data,state_keys[:lk],config,fp)
+## CSV output
+state_keys = ['state']
+with open('./outputs/state-%s-panel.csv', 'w') as fp:
+    prep_data.list_dict_panel(state_data,state_keys,config,fp)
 
-""" % ('%s','%s','%',time,time))
+for x in config['attribute_cd']:
+    state_keys.extend(['%s_%s' %s (x,y) for y in config['year']])
+
+with open('./outputs/state-%s.csv', 'w') as fc:
+    prep_data.list_dict_csv(state_data,state_keys,fc)
+
+""" % (time,time,'%s','%s','%',time))
 f.close()
     
 ## Create a job file

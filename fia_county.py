@@ -8,7 +8,7 @@ import json
 import prep_data
 
 ## Time
-time = time.strftime("%Y%h%d-%H%M")
+time = time.strftime("%Y%m%d-%H%M%S")
 
 ## Open JSON inputs
 config = json.load(open(sys.argv[1]))
@@ -168,24 +168,30 @@ for a in att_data_county:
     t = pattern.search(a)
     if t is None:
         continue
-    county_data_dict[t.group(1)].update({'year': config['year'][0], 'county_cd': t.group(1), 'county': t.group(2), 'state': t.group(3), t.group(5): t.group(6)})
+    county_data_dict[t.group(1)].update({'county_cd': t.group(1), 'county': t.group(2), 'state': t.group(3), t.group(5): t.group(6)})
 
 county_data = []
 for d in county_data_dict:
     county_data.append(county_data_dict[d])
 
 ## JSON output
-with open('./outputs/county-%s-%s.json', 'w') as fj:
+with open('./outputs/county-%s.json', 'w') as fj:
     json.dump(county_data, fj)
 
 ## CSV output
-county_keys = ['county_cd','county','state','year'] + ['%s_%s' %s (x,config['year'][0]) for x in config['attribute_cd']]
-with open('./outputs/county-%s-%s.csv', 'w') as fc:
+county_keys = ['county_cd','county','state']
+with open('./outputs/county-%s-panel.csv', 'w') as fp:
+    prep_data.list_dict_panel(county_data,county_keys,fp)
+
+for x in config['attribute_cd']:
+    county_keys.extend(['%s_%s' %s (x,y) for y in config['year']])
+
+with open('./outputs/county-%s.csv', 'w') as fc:
     prep_data.list_dict_csv(county_data,county_keys,fc)
     
-""" % (year,time,'%s','%s','%',year,time))
+""" % (time,time,'%s','%s','%',time))
 f.close()
-    
+
 ## Create a job file
 f = open('./job_county.sh','w')
 f.write("""#!/bin/bash
