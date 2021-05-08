@@ -10,6 +10,8 @@ time = time.strftime("%Y%m%d-%H%M%S")
 
 ## Open JSON inputs
 config = json.load(open(sys.argv[1]))
+tol = config['tolerance']
+maxj = config['job_number_max']
 attribute = json.load(open(sys.argv[2]))
 coordinate_data = json.load(open(sys.argv[3]))
 
@@ -19,10 +21,10 @@ install -dvp ${FIA}/html_coordinate/archived-%s
 mv ${FIA}/html_coordinate/*.html ${FIA}/html_coordinate/archived-%s
 rm ${FIA}/job-coordinate-*
 rm ${PROJ_HOME}/jobid-coordinate.log
+rm ${PROJ_HOME}/serial_coordinate_log.out
 """ % (time,time))
 
 ## Calculating optimal job size
-maxj = config['job_number_max'] # Maximun number of job that is allowed 
 ## opt_job_size find maximum size of each job to satisfy max job num (maxj) 
 opt_job_size = (len(config['attribute_cd']) * len(config['year']) * len(coordinate_data)) / maxj
 job_size = max(25, round(opt_job_size) + 1)
@@ -47,17 +49,16 @@ for att_cd in config['attribute_cd']:
             for l in coordinate_data[i:i+job_size]: # Select based on job_size
                 states_cd = [l['state_cd']] + l['neighbors_cd']
                 itr = 0
-                n = 4 # means searching 4 years before and 2 years after the desired year to find closest data if the desired year not available 
+                n = 2 * tol
                 while itr <= n:
                     if itr == 0:
-                        #print(year)
+                        yl = yh = year
                         cd_yr = ['%s%s' % (x,year) for x in states_cd]
                         f.write("""
 wget -c --tries=2 --random-wait "https://apps.fs.usda.gov/Evalidator/rest/Evalidator/fullreport?reptype=Circle&lat=%s&lon=%s&radius=%s&snum=%s&sdenom=No denominator - just produce estimates&wc=%s&pselected=None&rselected=All live stocking&cselected=All live stocking&ptime=Current&rtime=Current&ctime=Current&wf=&wnum=&wnumdenom=&FIAorRPA=FIADEF&outputFormat=HTML&estOnly=Y&schemaName=FS_FIADB." -O ${FIA}/html_coordinate/%s_%s_id%s_%s.html
                         """ % ( l['lat'],l['lon'],l['radius'],att,','.join(cd_yr),att_cd,year,l['unit_id'],year))
                     elif itr % 2 != 0:
-                        yl = year - int(itr/2) - 1
-                        #print(yl)
+                        yl = max((year - int(itr/2) - 1), 0)
                         cd_yr = ['%s%s' % (x,yl) for x in states_cd]
                         f.write("""
 if [ -f ${FIA}/html_coordinate/%s_%s_id%s_%s.html ]; then
@@ -69,7 +70,6 @@ fi
                         """ % (att_cd,year,l['unit_id'],yl+itr, att_cd,year,l['unit_id'],yl+itr, l['state_cd'],yl+itr, att_cd,year,l['unit_id'],yl+itr, att_cd,year,l['unit_id'],yl+itr, l['lat'],l['lon'],l['radius'],att,','.join(cd_yr), att_cd,year,l['unit_id'],yl))
                     else:
                         yh = year + int(itr/2)
-                        #print(yh)
                         cd_yr = ['%s%s' % (x,yh) for x in states_cd]
                         f.write("""
 if [ -f ${FIA}/html_coordinate/%s_%s_id%s_%s.html ]; then
@@ -103,7 +103,7 @@ fi
 if [ %d -gt 1 ]; then
 JID=$(sbatch --parsable ${FIA}/job-coordinate-%s-%s-%s.sh)
 echo ${JID} >> ${PROJ_HOME}/jobid-coordinate.log
-else . ${FIA}/job-coordinate-%s-%s-%s.sh >> ${PROJ_HOME}/serial_download_log.out
+else . ${FIA}/job-coordinate-%s-%s-%s.sh >> ${PROJ_HOME}/serial_coordinate_log.out
 fi
         """ % (maxj, att_cd,year,i, att_cd,year,i))
             i += job_size

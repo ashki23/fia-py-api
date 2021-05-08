@@ -12,14 +12,14 @@ time = time.strftime("%Y%m%d-%H%M%S")
 
 ## Open JSON inputs
 config = json.load(open(sys.argv[1]))
-attribute = json.load(open(sys.argv[2]))
-year = config['year'][0]
+tol = config['tolerance']
 maxj = int(config['job_number_max'])
+attribute = json.load(open(sys.argv[2]))
 
 ## Create a dictionary of FIA state codes
 with open('./state_codes.csv', 'r') as cd:
     state_cd = prep_data.csv_dict(cd)
-    
+
 ## Select states from the config
 state_cd = prep_data.state_config(state_cd,config)
             
@@ -29,7 +29,7 @@ install -dvp ${FIA}/html_county/archived-%s
 mv ${FIA}/html_county/*.html ${FIA}/html_county/archived-%s
 rm ${FIA}/job-county-*
 rm ${PROJ_HOME}/jobid-county.log
-rm ${PROJ_HOME}/serial_download_log.out
+rm ${PROJ_HOME}/serial_county_log.out
 """ % (time,time))
 
 ## Create job files to download FIA HTML queries
@@ -48,17 +48,17 @@ for i in state_cd:
         for att_cd in config['attribute_cd']:
             att = attribute['%d' % att_cd]
             itr = 0
-            n = 4
+            n = 2 * tol
             while itr <= n:
                 if itr == 0:
+                    yl = yh = year
                     cd_yr = ['%s%s' % (x,year) for x in [state_cd[i]]]
                     f.write("""
 echo "---------------- %s - %s - %s"
 wget -c --tries=2 --random-wait "https://apps.fs.usda.gov/Evalidator/rest/Evalidator/fullreport?reptype=State&lat=0&lon=0&radius=0&snum=%s&sdenom=No denominator - just produce estimates&wc=%s&pselected=None&rselected=County code and name&cselected=All live stocking&ptime=Current&rtime=Current&ctime=Current&wf=&wnum=&wnumdenom=&FIAorRPA=FIADEF&outputFormat=HTML&estOnly=Y&schemaName=FS_FIADB." -O ${FIA}/html_county/%s_%s_%s_%s.html
                     """ % (year,i,att,att,','.join(cd_yr),att_cd,year,i,year))
                 elif itr % 2 != 0:
-                    yl = year - int(itr/2) - 1
-                    #print(yl)
+                    yl = max((year - int(itr/2) - 1), 0)
                     cd_yr = ['%s%s' % (x,yl) for x in [state_cd[i]]]
                     f.write("""
 if [ -f ${FIA}/html_county/%s_%s_%s_%s.html ]; then
@@ -70,7 +70,6 @@ fi
                     """ % (att_cd,year,i,yl+itr, att_cd,year,i,yl+itr, state_cd[i],yl+itr, att_cd,year,i,yl+itr, att_cd,year,i,yl+itr, att,','.join(cd_yr), att_cd,year,i,yl))
                 else:
                     yh = year + int(itr/2)
-                    #print(yh)
                     cd_yr = ['%s%s' % (x,yh) for x in [state_cd[i]]]
                     f.write("""
 if [ -f ${FIA}/html_county/%s_%s_%s_%s.html ]; then
@@ -103,7 +102,7 @@ fi
 if [ %d -gt 1 ]; then
 JID=$(sbatch --parsable ${FIA}/job-county-%s.sh)
 echo ${JID} >> ${PROJ_HOME}/jobid-county.log 
-else . ${FIA}/job-county-%s.sh >> ${PROJ_HOME}/serial_download_log.out
+else . ${FIA}/job-county-%s.sh >> ${PROJ_HOME}/serial_county_log.out
 fi
     """ % (maxj,i,i))
 
