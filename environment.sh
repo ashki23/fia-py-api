@@ -4,9 +4,7 @@ export PROJ_HOME=${PWD}
 export OUTPUT=${PWD}/outputs
 export FIA=${PWD}/fia_data
 install -dvp ${OUTPUT}
-install -dvp ${FIA}/html_county
-install -dvp ${FIA}/html_state
-install -dvp ${FIA}/html_coordinate
+install -dvp ${FIA}
 MYHOME=${HOME}
 
 ## Install Miniconda

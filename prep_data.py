@@ -29,10 +29,11 @@ def csv_list_dict(csv_file):
     ncol = len(header)
     list_dict = []
     for row in csv_data:
-        mm = {}
-        for i in range(ncol):
-            mm[header[i]] = row[i]
-        list_dict.append(mm)
+        if len(row) > 0:
+            mm = {}
+            for i in range(ncol):
+                mm[header[i]] = row[i]
+            list_dict.append(mm)
     return list_dict
 
 def select_state_config(list_dict,config):
