@@ -4,7 +4,7 @@ export PROJ_HOME=${PWD}
 export OUTPUT=${PWD}/outputs
 export FIA=${PWD}/fia_data
 install -dvp ${OUTPUT}
-install -dvp ${FIA}
+install -dvp ${FIA}/survey
 MYHOME=${HOME}
 
 ## Install Miniconda

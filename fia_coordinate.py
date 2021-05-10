@@ -27,7 +27,7 @@ rm ${{PROJ_HOME}}/serial-{file_name}-log.out
 ## Calculating optimal job size
 ## opt_job_size find maximum size of each job to satisfy max job num (maxj) 
 opt_job_size = (len(config['attribute_cd']) * len(config['year']) * len(input_data)) / maxj
-job_size = max(25, round(opt_job_size) + 1)
+job_size = round(opt_job_size) + 1
 
 ## Create job files to download FIA HTML queries
 for att_cd in config['attribute_cd']:
@@ -46,56 +46,34 @@ for att_cd in config['attribute_cd']:
 #SBATCH --partition={config['partition']}
 #SBATCH --time=08:00:00
             """)
-            for l in input_data[i:i+job_size]: # Select based on job_size
+            for l in input_data[i:i + job_size]: # Select based on job_size
+                states_all = [l['state']] + l['neighbors']
                 states_cd = [l['state_cd']] + l['neighbors_cd']
-                itr = 0
-                n = 2 * tol
-                while itr <= n:
-                    if itr == 0:
-                        yl = yh = year
-                        cd_yr = [f"{x}{year}" for x in states_cd]
-                        file_path = f"${{FIA}}/html/{file_name}_{time}/{att_cd}_{year}_id{l['unit_id']}"
-                        job.write(f"""
-echo "---------------- {year} - {att} row {i} - {i + job_size}"
-wget -c --tries=2 --random-wait "https://apps.fs.usda.gov/Evalidator/rest/Evalidator/fullreport?reptype=Circle&lat={l['lat']}&lon={l['lon']}&radius={l['radius']}&snum={att}&sdenom=No denominator - just produce estimates&wc={','.join(cd_yr)}&pselected=None&rselected=All live stocking&cselected=All live stocking&ptime=Current&rtime=Current&ctime=Current&wf=&wnum=&wnumdenom=&FIAorRPA=FIADEF&outputFormat=HTML&estOnly=Y&schemaName=FS_FIADB." -O {file_path}_{year}.html
-                        """)
-                    elif itr % 2 != 0:
-                        yl = year - int(itr/2) - 1
-                        cd_yr = [f"{x}{yl}" for x in states_cd]
-                        job.write(f"""
-if [ -f {file_path}_{yl+itr}.html ]; then
-if [ $(cat {file_path}_{yl+itr}.html | grep -c {l['state_cd']}{yl+itr}) -le 1 ] || [ $(cat {file_path}_{yl+itr}.html | grep -c '>Total<') -le 1 ]; then
-rm {file_path}_{yl+itr}.html
-wget -c --tries=2 --random-wait "https://apps.fs.usda.gov/Evalidator/rest/Evalidator/fullreport?reptype=Circle&lat={l['lat']}&lon={l['lon']}&radius={l['radius']}&snum={att}&sdenom=No denominator - just produce estimates&wc={','.join(cd_yr)}&pselected=None&rselected=All live stocking&cselected=All live stocking&ptime=Current&rtime=Current&ctime=Current&wf=&wnum=&wnumdenom=&FIAorRPA=FIADEF&outputFormat=HTML&estOnly=Y&schemaName=FS_FIADB." -O {file_path}_{yl}.html
-fi
-fi
-                        """)
-                    else:
-                        yh = year + int(itr/2)
-                        cd_yr = [f"{x}{yh}" for x in states_cd]
-                        job.write(f"""
-if [ -f {file_path}_{yh-itr}.html ]; then
-if [ $(cat {file_path}_{yh-itr}.html | grep -c {l['state_cd']}{yh-itr}) -le 1 ] || [ $(cat {file_path}_{yh-itr}.html | grep -c '>Total<') -le 1 ]; then
-rm {file_path}_{yh-itr}.html
-wget -c --tries=2 --random-wait "https://apps.fs.usda.gov/Evalidator/rest/Evalidator/fullreport?reptype=Circle&lat={l['lat']}&lon={l['lon']}&radius={l['radius']}&snum={att}&sdenom=No denominator - just produce estimates&wc={','.join(cd_yr)}&pselected=None&rselected=All live stocking&cselected=All live stocking&ptime=Current&rtime=Current&ctime=Current&wf=&wnum=&wnumdenom=&FIAorRPA=FIADEF&outputFormat=HTML&estOnly=Y&schemaName=FS_FIADB." -O {file_path}_{yh}.html
-fi
-fi
-                        """)
-                    itr += 1
+                st_invyr = {}
+                for st in states_all:
+                    invyr = os.popen(f"""
+                    if [ ! -f ./fia_data/survey/{st}_SURVEY.csv ]; then
+                    wget -c -nv --tries=2 https://apps.fs.usda.gov/fia/datamart/CSV/{st}_SURVEY.csv -P ./fia_data/survey
+                    fi
+                    cat ./fia_data/survey/{st}_SURVEY.csv | awk -F , '{{print $2}}' | tail -n +2 | sort | uniq
+                    """).read()[:-1].split('\n')
+                    st_invyr[states_cd[states_all.index(st)]] = invyr
+                
+                if tol == 0:
+                    yr = year
+                    cd_yr = [f"{x}{yr}" for x in states_cd]
+                else:
+                    cd_yr = []
+                    for si in st_invyr.keys():
+                        diff = [abs(int(x) - year) for x in st_invyr[si]]
+                        indx = diff.index(min(diff))
+                        yr = st_invyr[si][indx]
+                        cd_yr.append(f"{si}{yr}")
+                
+                file_path = f"${{FIA}}/html/{file_name}_{time}/{att_cd}_{year}_id{l['unit_id']}"
                 job.write(f"""
-if [ -f {file_path}_{yl}.html ]; then
-if [ $(cat {file_path}_{yl}.html | grep -c {l['state_cd']}{yl}) -le 1 ] || [ $(cat {file_path}_{yl}.html | grep -c '>Total<') -le 1 ]; then
-rm {file_path}_{yl}.html
-echo "ERROR: the FIA dataset does not include records for {att} for state {l['state_cd']} between {yl}-{yh}"
-fi
-fi
-
-if [ -f {file_path}_{yh}.html ]; then
-if [ $(cat {file_path}_{yh}.html | grep -c {l['state_cd']}{yh}) -le 1 ] || [ $(cat {file_path}_{yh}.html | grep -c '>Total<') -le 1 ]; then
-rm {file_path}_{yh}.html
-echo "ERROR: the FIA dataset does not include records for {att} for state {l['state_cd']} between {yl}-{yh}"
-fi
-fi
+echo "---------------- {year} - {att} row {i} - {i + job_size}"
+wget -c --tries=2 --random-wait "https://apps.fs.usda.gov/Evalidator/rest/Evalidator/fullreport?reptype=Circle&lat={l['lat']}&lon={l['lon']}&radius={l['radius']}&snum={att}&sdenom=No denominator - just produce estimates&wc={','.join(cd_yr)}&pselected=None&rselected=All live stocking&cselected=All live stocking&ptime=Current&rtime=Current&ctime=Current&wf=&wnum=&wnumdenom=&FIAorRPA=FIADEF&outputFormat=HTML&estOnly=Y&schemaName=FS_FIADB." -O {file_path}_{yr}.html
                 """)
             job.close()
             
