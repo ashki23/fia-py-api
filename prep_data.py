@@ -3,7 +3,6 @@
 import sys
 import csv
 import json
-import xlrd
 import geocoder
 import collections
 
@@ -112,11 +111,13 @@ def list_dict_panel(list_dict,keys,config,csv_output):
                     i[ay] = 'NA'
             fcsv.writerow(row + [y] + [i[x] for x in att_yr])
 
-
 if __name__=='__main__':
     ## Read config
     config = json.load(open(sys.argv[1]))
     year = config['year']
+    state = config['state']
+    
+    assert "DC" not in state, "FIA does not include data for DC. Remove DC from the listed states in the config file."
     
     ## FIA attributes
     with open('./attributes_all.csv', 'r') as att:
