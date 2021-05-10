@@ -3,8 +3,8 @@
     "state": ["AL","LA"],
     "attribute_cd": [7,8],
     "tolerance": 1,
-    "job_number_max": 100,
-    "time_hr_max": 24,
+    "job_number_max": 24,
+    "job_time_hr": 8,
     "partition": "General",
     "query_type": ["state","county","coordinate"]
 }

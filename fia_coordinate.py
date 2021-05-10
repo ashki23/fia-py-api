@@ -44,7 +44,7 @@ for att_cd in config['attribute_cd']:
 #SBATCH --cpus-per-task=1
 #SBATCH --mem=1G
 #SBATCH --partition={config['partition']}
-#SBATCH --time=08:00:00
+#SBATCH --time={config['job_time_hr']}:00:00
             """)
             for l in input_data[i:i + job_size]: # Select based on job_size
                 states_all = [l['state']] + l['neighbors']

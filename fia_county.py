@@ -41,7 +41,7 @@ for i in state_cd.keys():
 #SBATCH --cpus-per-task=1
 #SBATCH --mem=1G
 #SBATCH --partition={config['partition']}
-#SBATCH --time=04:00:00
+#SBATCH --time={config['job_time_hr']}:00:00
     """)
     for year in config['year']:
         for att_cd in config['attribute_cd']:
