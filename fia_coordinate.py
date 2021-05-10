@@ -64,11 +64,14 @@ for att_cd in config['attribute_cd']:
                     cd_yr = [f"{x}{yr}" for x in states_cd]
                 else:
                     cd_yr = []
+                    yr = []
                     for si in st_invyr.keys():
                         diff = [abs(int(x) - year) for x in st_invyr[si]]
                         indx = diff.index(min(diff))
-                        yr = st_invyr[si][indx]
-                        cd_yr.append(f"{si}{yr}")
+                        yr_i = st_invyr[si][indx]
+                        cd_yr.append(f"{si}{yr_i}")
+                        yr.append(yr_i)
+                    yr = yr[0]
                 
                 file_path = f"${{FIA}}/html/{file_name}_{time}/{att_cd}_{year}_id{l['unit_id']}"
                 job.write(f"""
