@@ -40,7 +40,7 @@ for att_cd in config['attribute_cd']:
             job = open(f"./fia_data/job-{file_name}-{att_cd}-{year}-{i}.sh",'w')
             job.write(f"""#!/bin/bash
 
-#SBATCH --job-name=FIAQuery
+#SBATCH --job-name={file_name}-{att_cd}-{year}-{i}
 #SBATCH --cpus-per-task=1
 #SBATCH --mem=1G
 #SBATCH --partition={config['partition']}

@@ -37,7 +37,7 @@ for i in state_cd.keys():
     job = open(f"./fia_data/job-county-{i}.sh",'w')
     job.write(f"""#!/bin/bash
 
-#SBATCH --job-name=FIAQueryC_{i}
+#SBATCH --job-name=county-{i}
 #SBATCH --cpus-per-task=1
 #SBATCH --mem=1G
 #SBATCH --partition={config['partition']}

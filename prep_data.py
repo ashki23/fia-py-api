@@ -159,7 +159,7 @@ if __name__=='__main__':
     
     ## Coordinates
     if "coordinate" in config['query_type']:
-        with open('./coordinates.csv', 'r') as xy:
+        with open('./coordinate.csv', 'r') as xy:
             xydata = csv_list_dict(xy)
 
         header = xydata[0].keys()
@@ -174,5 +174,5 @@ if __name__=='__main__':
             p['neighbors_cd'] =  neighbor_cd[p['state']]
         
         ### JSON output of coordinates
-        with open('./coordinates.json', 'w') as fj:
+        with open('./coordinate.json', 'w') as fj:
             json.dump(xydata,fj)
