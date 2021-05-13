@@ -1,6 +1,6 @@
 #!/bin/bash
 
-read -p 'What type of query is failed (insert one of state, county or coordinate)? ' query_name
+read -p 'Select the query type (insert one of state, county or coordinate): ' query_name
 
 ## Set env variables 
 source environment.sh
