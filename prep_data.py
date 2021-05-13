@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import os
 import sys
 import csv
 import json
@@ -159,11 +160,14 @@ if __name__=='__main__':
     
     ## Coordinates
     if "coordinate" in config['query_type']:
+        
+        assert os.path.exists('./coordinate.csv'), "'coordinate.csv' does not exist."
+        
         with open('./coordinate.csv', 'r') as xy:
             xydata = csv_list_dict(xy)
-
+        
         header = xydata[0].keys()
-        assert all(x in header for x in ['lat','lon','radius']), "Error: 'coordinate.csv' does not include required filds, 'lat', 'lon', and 'radius'."
+        assert all(x in header for x in ['lat','lon','radius']), "'coordinate.csv' does not include required filds, 'lat', 'lon', and 'radius'."
         
         for p in xydata:
             p['unit_id'] = (str(p['lat']).replace('.','') + str(p['lon']).replace('.','').replace('-',''))[:8]
