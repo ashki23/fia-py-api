@@ -66,18 +66,23 @@ for i in state_cd.keys():
             
             file_path = f"${{FIA}}/html/county_{time}/{att_cd}_{year}_{i}"
             job.write(f"""
-echo "---------------- {year} - {i} - {att}"
-wget -c --tries=2 --random-wait "https://apps.fs.usda.gov/Evalidator/rest/Evalidator/fullreport?reptype=State&lat=0&lon=0&radius=0&snum={att}&sdenom=No denominator - just produce estimates&wc={','.join(cd_yr)}&pselected=None&rselected=County code and name&cselected=All live stocking&ptime=Current&rtime=Current&ctime=Current&wf=&wnum=&wnumdenom=&FIAorRPA=FIADEF&outputFormat=HTML&estOnly=Y&schemaName=FS_FIADB." -O {file_path}_{yr}.html
+echo "---------------- county-{i}-{year}-{att_cd}"
+wget -c --tries=2 --random-wait "https://apps.fs.usda.gov/Evalidator/rest/Evalidator/fullreport?reptype=State&lat=0&lon=0&radius=0&snum={att}&sdenom=No denominator - just produce estimates&wc={','.join(cd_yr)}&pselected=None&rselected=County code and name&cselected=None&ptime=Current&rtime=Current&ctime=Current&wf=&wnum=&wnumdenom=&FIAorRPA=FIADEF&outputFormat=HTML&estOnly=Y&schemaName=FS_FIADB." -O {file_path}_{yr}.html
+
+if [ -f {file_path}_{yr}.html ]; then
+if ! grep -q {state_cd[i]}{yr} {file_path}_{yr}.html || ! grep -q '>Total<' {file_path}_{yr}.html; then
+rm {file_path}_{yr}.html
+echo "Warning: Extracted data for {att} in state {i} in year {yr} does not include required information."; fi; fi
             """)
     job.close()
     
     ## Send the job file to run
     os.system(f"""
-if [ {maxj} -gt 1 ]; then
-JID=$(sbatch --parsable ${{FIA}}/job-county-{i}.sh)
-echo ${{JID}} >> ${{PROJ_HOME}}/jobid-county.log
-else . ${{FIA}}/job-county-{i}.sh >> ${{PROJ_HOME}}/serial-county-log.out
-fi
+    if [ {maxj} -gt 1 ]; then
+    JID=$(sbatch --parsable ${{FIA}}/job-county-{i}.sh)
+    echo ${{JID}} >> ${{PROJ_HOME}}/jobid-county.log
+    else . ${{FIA}}/job-county-{i}.sh >> ${{PROJ_HOME}}/serial-county-log.out
+    fi
     """)
 
 ## Create a Bash file to extract level of attributes from FIA HTML files
@@ -87,9 +92,11 @@ job.write(f"""#!/bin/bash
 
 #SBATCH --job-name=Extract
 #SBATCH --mem=4G
+#SBATCH --partition={config['partition']}
 
 echo "success: resources has been allocated"
 cd ${{FIA}}/html/county_{time}
+if [ -f ./county.txt ]; then rm *.txt; fi
 
 for i in *.html; do
 cat $i | grep -Po '(?<=nowrap="nowrap">)\d.*(?=<)' | grep -Po '([0-9]*)' >> ./county_cd.txt
@@ -167,10 +174,11 @@ job.close()
 
 ## Create a job file
 job = open('./job_county.sh','w')
-job.write("""#!/bin/bash
+job.write(f"""#!/bin/bash
 
 #SBATCH --job-name=Output
 #SBATCH --mem=2G
+#SBATCH --partition={config['partition']}
 
 python job_county.py config.json
 """)

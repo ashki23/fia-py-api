@@ -46,7 +46,8 @@ for att_cd in config['attribute_cd']:
 #SBATCH --partition={config['partition']}
 #SBATCH --time={config['job_time_hr']}:00:00
             """)
-            for l in input_data[i:i + job_size]: # Select based on job_size
+            lnum = 1
+            for l in input_data[i:i + job_size]:
                 states_all = [l['state']] + l['neighbors']
                 states_cd = [l['state_cd']] + l['neighbors_cd']
                 st_invyr = {}
@@ -75,19 +76,25 @@ for att_cd in config['attribute_cd']:
                 
                 file_path = f"${{FIA}}/html/{file_name}_{time}/{att_cd}_{year}_id{l['unit_id']}"
                 job.write(f"""
-echo "---------------- job-{file_name}-{att_cd}-{year}-{i}|{l}"
-wget -c --tries=2 --random-wait "https://apps.fs.usda.gov/Evalidator/rest/Evalidator/fullreport?reptype=Circle&lat={l['lat']}&lon={l['lon']}&radius={l['radius']}&snum={att}&sdenom=No denominator - just produce estimates&wc={','.join(cd_yr)}&pselected=None&rselected=All live stocking&cselected=All live stocking&ptime=Current&rtime=Current&ctime=Current&wf=&wnum=&wnumdenom=&FIAorRPA=FIADEF&outputFormat=HTML&estOnly=Y&schemaName=FS_FIADB." -O {file_path}_{yr}.html
+echo "---------------- {file_name}-{att_cd}-{year}-{i} | {lnum} out of {len(input_data[i:i + job_size])}"
+wget -c --tries=2 --random-wait "https://apps.fs.usda.gov/Evalidator/rest/Evalidator/fullreport?reptype=Circle&lat={l['lat']}&lon={l['lon']}&radius={l['radius']}&snum={att}&sdenom=No denominator - just produce estimates&wc={','.join(cd_yr)}&pselected=None&rselected=All live stocking&cselected=None&ptime=Current&rtime=Current&ctime=Current&wf=&wnum=&wnumdenom=&FIAorRPA=FIADEF&outputFormat=HTML&estOnly=Y&schemaName=FS_FIADB." -O {file_path}_{yr}.html
+
+if [ -f {file_path}_{yr}.html ]; then
+if ! grep -q {l['state_cd']}{yr} {file_path}_{yr}.html || ! grep -q '>Total<' {file_path}_{yr}.html; then
+rm {file_path}_{yr}.html
+echo "Warning: Extracted data for {att} in state {l['state']} in year {yr} does not include required information."; fi; fi
                 """)
             job.close()
+            lnum += 1
             
             ## Send the job file to run
             os.system(f"""
-if [ {maxj} -gt 1 ]; then
-JID=$(sbatch --parsable ${{FIA}}/job-{file_name}-{att_cd}-{year}-{i}.sh)
-echo ${{JID}} >> ${{PROJ_HOME}}/jobid-{file_name}.log
-else . ${{FIA}}/job-{file_name}-{att_cd}-{year}-{i}.sh >> ${{PROJ_HOME}}/serial-{file_name}-log.out
-fi
-        """)
+            if [ {maxj} -gt 1 ]; then
+            JID=$(sbatch --parsable ${{FIA}}/job-{file_name}-{att_cd}-{year}-{i}.sh)
+            echo ${{JID}} >> ${{PROJ_HOME}}/jobid-{file_name}.log
+            else . ${{FIA}}/job-{file_name}-{att_cd}-{year}-{i}.sh >> ${{PROJ_HOME}}/serial-{file_name}-log.out
+            fi
+            """)
             i += job_size
 
 ## Create a Bash file to extract level of attributes from FIA HTML
@@ -97,15 +104,17 @@ job.write(f"""#!/bin/bash
 
 #SBATCH --job-name=Extract
 #SBATCH --mem=16G
+#SBATCH --partition={config['partition']}
 
 echo "success: resources has been allocated"
 cd ${{FIA}}/html/{file_name}_{time}
+if [ -f ./year.txt ]; then rm *.txt; fi
 
 for i in *.html; do
 echo $i | grep -Po '^\d*(?=_)' >> ./att.txt
 echo $i | grep -Po '(?<=id)\d*(?=_)' >> ./unit_id.txt
 echo $i | grep -Po '(?<=_)\d{{4}}(?=_.)' >> ./year.txt
-cat $i | grep -A 1 'nowrap="nowrap">Total</th>' | tr -d , | grep -Po '\d*' >> ./att_total.txt 
+cat $i | grep -A 1 'nowrap="nowrap">Total</th>' | tr -d , | grep -Po '\d*' >> ./att_total.txt
 done
 
 paste -d _ att.txt year.txt > ./att_year.txt
@@ -185,6 +194,7 @@ job.write(f"""#!/bin/bash
 
 #SBATCH --job-name=Output
 #SBATCH --mem=8G
+#SBATCH --partition={config['partition']}
 
 python job_{file_name}.py config.json {file_name}.json
 """)
