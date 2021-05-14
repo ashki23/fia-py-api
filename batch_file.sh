@@ -19,8 +19,5 @@ echo =============== HTML queries =============== $(hostname) $(date)
 if jq ."query_type" config.json | grep -q "coordinate"; then
 python fia_coordinate.py config.json attributes.json coordinate.json || return; fi
 
-if jq ."query_type" config.json | grep -q "county"; then
+if jq ."query_type" config.json | grep -Pq "county|state"; then
 python fia_county.py config.json attributes.json || return; fi
-
-if jq ."query_type" config.json | grep -q "state"; then
-python fia_state.py config.json attributes.json || return; fi

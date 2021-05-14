@@ -17,12 +17,7 @@ JID=$(sbatch --parseable ${FIA}/job-${j}.sh)
 echo ${JID} >> ${PROJ_HOME}/jobid-failed-${query_name}.log
 done
 
-## Re-extract informations from HTML files
+## Re-extract informations from JSON files
 sleep 3
 JOBID=$(cat ${PROJ_HOME}/jobid-failed-${query_name}.log | tr '\n' ',' | grep -Po '.*(?=,)')
-JID=$(sbatch --parsable --dependency=afterok:$(echo ${JOBID}) ${FIA}/job-${query_name}-html.sh)
-echo ${JID} > ${PROJ_HOME}/jobid-failed-${query_name}.log
-
-## Re-generate the outputs
-sleep 3
-JID=$(sbatch --parsable --dependency=afterok:$(cat ${PROJ_HOME}/jobid-${query_name}.log) ${PROJ_HOME}/job_${query_name}.sh)
+sbatch --parsable --dependency=afterok:$(echo ${JOBID}) ${PROJ_HOME}/job_${query_name}.sh
