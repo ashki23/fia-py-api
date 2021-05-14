@@ -50,19 +50,31 @@ for att_cd in config['attribute_cd']:
             for l in input_data[i:i + job_size]:
                 states_all = [l['state']] + l['neighbors']
                 states_cd = [l['state_cd']] + l['neighbors_cd']
+                
                 st_invyr = {}
                 for st in states_all:
-                    invyr = os.popen(f"""
-                    if [ ! -f ./fia_data/survey/{st}_SURVEY.csv ]; then
-                    wget -c -nv --tries=2 https://apps.fs.usda.gov/fia/datamart/CSV/{st}_SURVEY.csv -P ./fia_data/survey
+                    invyr_id = os.popen(f"""
+                    if [ ! -f ./fia_data/survey/{st}_POP_STRATUM.csv ]; then
+                    wget -c -nv --tries=2 https://apps.fs.usda.gov/fia/datamart/CSV/{st}_POP_STRATUM.csv -P ./fia_data/survey
                     fi
-                    cat ./fia_data/survey/{st}_SURVEY.csv | awk -F , '{{print $2}}' | tail -n +2 | sort | uniq
+                    cat ./fia_data/survey/{st}_POP_STRATUM.csv | awk -F , '{{print $4}}' | grep ".*01$" | sort | uniq
                     """).read()[:-1].split('\n')
+                    
+                    if len(invyr_id[0]) == 6:
+                        in_yr = [x[2:-2] for x in invyr_id]
+                    else:
+                        in_yr = [x[1:-2] for x in invyr_id]
+                    
+                    invyr = [f"20{x}" for x in in_yr if int(x) < int(time[2:4])] + [f"19{x}" for x in in_yr if int(x) > int(time[2:4])]
                     st_invyr[states_cd[states_all.index(st)]] = invyr
-                
+                    
                 if tol == 0:
-                    yr = year
-                    cd_yr = [f"{x}{yr}" for x in states_cd]
+                    if year in st_invyr[l['state_cd']]:
+                        yr = year
+                        cd_yr = [f"{x}{yr}" for x in states_cd]
+                    else:
+                        print(f"Warning: Estimate not available for state {i} for year {year}.")
+                        continue
                 else:
                     cd_yr = []
                     yr = []
@@ -96,6 +108,8 @@ wget -c --tries=2 --random-wait "https://apps.fs.usda.gov/Evalidator/rest/Evalid
 job = open(f"./job_{file_name}.py",'w')
 job.write(f"""#!/usr/bin/env python
 
+import re
+import os
 import sys
 import csv
 import json
@@ -114,6 +128,8 @@ for i in json_files:
     except json.decoder.JSONDecodeError:
         continue
 
+    n = os.path.basename(i)
+    year = re.findall('(?<=_)\d{{4}}(?=_.)', i)[0]
     lat = js_data['EVALIDatorOutput']['circleLatitude']
     lon = js_data['EVALIDatorOutput']['circleLongitude']
     radius = js_data['EVALIDatorOutput']['circleRadiusMiles']
@@ -122,7 +138,7 @@ for i in json_files:
     unit_id = (str(lat).replace('.','') + str(lon).replace('.','').replace('-',''))[:8]
     state = state_inv[0].capitalize()
     state_cd = state_inv[1][:-4]
-    year = state_inv[1][2:]
+    year_survey = state_inv[1][2:]
     value = round(js_data['EVALIDatorOutput']['row'][0]['column'][0]['cellValueNumerator'])
     att_coordinate[unit_id].update({{'unit_id': unit_id, 'state': state, 'state_cd': state_cd, 'lat': lat, 'lon': lon, 'radius': radius, f"{{att_cd}}_{{year}}": value}})
 

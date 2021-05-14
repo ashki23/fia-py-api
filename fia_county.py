@@ -44,25 +44,35 @@ for i in state_cd.keys():
 #SBATCH --time={config['job_time_hr']}:00:00
     """)
     for year in config['year']:
-        for att_cd in config['attribute_cd']:
-            att = attribute[str(att_cd)]
-            
-            invyr = os.popen(f"""
-            if [ ! -f ./fia_data/survey/{i}_SURVEY.csv ]; then
-            wget -c -nv --tries=2 https://apps.fs.usda.gov/fia/datamart/CSV/{i}_SURVEY.csv -P ./fia_data/survey
-            fi
-            cat ./fia_data/survey/{i}_SURVEY.csv | awk -F , '{{print $2}}' | tail -n +2 | sort | uniq
-            """).read()[:-1].split('\n')
-            
-            if tol == 0:
+        invyr_id = os.popen(f"""
+        if [ ! -f ./fia_data/survey/{i}_POP_STRATUM.csv ]; then
+        wget -c -nv --tries=2 https://apps.fs.usda.gov/fia/datamart/CSV/{i}_POP_STRATUM.csv -P ./fia_data/survey; fi
+        cat ./fia_data/survey/{i}_POP_STRATUM.csv | awk -F , '{{print $4}}' | grep ".*01$" | sort | uniq
+        """).read()[:-1].split('\n')
+        
+        if len(invyr_id[0]) == 6:
+            in_yr = [x[2:-2] for x in invyr_id]
+        else:
+            in_yr = [x[1:-2] for x in invyr_id]
+        
+        invyr = [f"20{x}" for x in in_yr if int(x) < int(time[2:4])] + [f"19{x}" for x in in_yr if int(x) > int(time[2:4])]
+        
+        if tol == 0:
+            if year in invyr:
                 yr = year
                 cd_yr = [f"{state_cd[i]}{yr}"]
             else:
-                cd_yr = []
-                diff = [abs(int(x) - year) for x in invyr]
-                indx = diff.index(min(diff))
-                yr = invyr[indx]
-                cd_yr.append(f"{state_cd[i]}{yr}")
+                print(f"Warning: Estimate not available for state {i} for year {year}.")
+                continue
+        else:
+            cd_yr = []
+            diff = [abs(int(x) - year) for x in invyr]
+            indx = diff.index(min(diff))
+            yr = invyr[indx]
+            cd_yr.append(f"{state_cd[i]}{yr}")
+            
+        for att_cd in config['attribute_cd']:
+            att = attribute[str(att_cd)]
             
             file_path = f"${{FIA}}/json/county_{time}/{att_cd}_{year}_{i}"
             batch.write(f"""
@@ -84,6 +94,8 @@ wget -c --tries=2 --random-wait "https://apps.fs.usda.gov/Evalidator/rest/Evalid
 job = open('./job_county.py','w')
 job.write(f"""#!/usr/bin/env python
 
+import re
+import os
 import sys
 import csv
 import json
@@ -104,21 +116,23 @@ for i in json_files:
     except json.decoder.JSONDecodeError:
         continue
 
+    n = os.path.basename(i)
+    year = re.findall('(?<=_)\d{{4}}(?=_.)', i)[0]
     state_abb = js_data['EVALIDatorOutput']['row'][1]['content'].split()[1].upper()
     att_cd = js_data['EVALIDatorOutput']['numeratorAttributeNumber']
     state_inv = js_data['EVALIDatorOutput']['selectedInventories']['stateInventory'].split()
     state = state_inv[0].capitalize()
     state_cd = state_inv[1][:-4]
-    year = state_inv[1][2:]
+    year_survey = state_inv[1][2:]
     
     for j in js_data['EVALIDatorOutput']['row']:
         content = j['content'].split()
         value = round(j['column'][0]['cellValueNumerator'])
         if content[0] == 'Total':
-            att_state[state_abb].update({{'state': state, f"{{att_cd}}_{{year}}": value}})
+            att_state[state_abb].update({{'state': state_abb, f"{{att_cd}}_{{year}}": value}})
         else:
             county = content[2].capitalize()
-            att_county[f"{{county}}_{{state_abb}}"].update({{'county_cd': content[0], 'county': county, 'state_abb': state_abb, f"{{att_cd}}_{{year}}": value}})
+            att_county[f"{{county}}_{{state_abb}}"].update({{'county_cd': content[0], 'county': county, 'state': state_abb, f"{{att_cd}}_{{year}}": value}})
 
 ## JSON output
 with open('./outputs/county-{time}.json', 'w') as fj:
@@ -129,7 +143,8 @@ with open('./outputs/state-{time}.json', 'w') as fj:
 
 ## CSV output - county
 list_county = [x for x in att_county.values()]
-county_keys = ['county_cd','county','state']
+lk = len(config['attribute_cd']) * len(config['year'])
+county_keys = list(list_county[0].keys())[:-lk]
 with open('./outputs/county-panel-{time}.csv', 'w') as fp:
     prep_data.list_dict_panel(list_county,county_keys,config,fp)
 
@@ -141,7 +156,7 @@ with open('./outputs/county-{time}.csv', 'w') as fc:
 
 ## CSV output - state
 list_state = [x for x in att_state.values()]
-state_keys = ['state']
+state_keys = list(list_state[0].keys())[:-lk]
 with open('./outputs/state-panel-{time}.csv', 'w') as fp:
     prep_data.list_dict_panel(list_state,state_keys,config,fp)
 
