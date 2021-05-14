@@ -58,11 +58,11 @@ for i in state_cd.keys():
         invyr = [f"20{x}" for x in in_yr if int(x) < int(time[2:4])] + [f"19{x}" for x in in_yr if int(x) > int(time[2:4])]
         
         if tol == 0:
-            if year in invyr:
+            if str(year) in invyr:
                 yr = year
                 cd_yr = [f"{state_cd[i]}{yr}"]
             else:
-                print(f"Warning: Estimate not available for state {i} for year {year}.")
+                print(f"\n-------- Warning: Estimate not available for state {i} for year {year} --------\n")
                 continue
         else:
             cd_yr = []
@@ -144,27 +144,29 @@ with open('./outputs/state-{time}.json', 'w') as fj:
 ## CSV output - county
 list_county = [x for x in att_county.values()]
 lk = len(config['attribute_cd']) * len(config['year'])
-county_keys = list(list_county[0].keys())[:-lk]
-with open('./outputs/county-panel-{time}.csv', 'w') as fp:
-    prep_data.list_dict_panel(list_county,county_keys,config,fp)
+if len(list_county) > 0:
+    county_keys = list(list_county[0].keys())[:-lk]
+    with open('./outputs/county-panel-{time}.csv', 'w') as fp:
+        prep_data.list_dict_panel(list_county,county_keys,config,fp)
 
-for x in config['attribute_cd']:
-    county_keys.extend([f"{{x}}_{{y}}" for y in config['year']])
+    for x in config['attribute_cd']:
+        county_keys.extend([f"{{x}}_{{y}}" for y in config['year']])
 
-with open('./outputs/county-{time}.csv', 'w') as fc:
-    prep_data.list_dict_csv(list_county,county_keys,fc)
+    with open('./outputs/county-{time}.csv', 'w') as fc:
+        prep_data.list_dict_csv(list_county,county_keys,fc)
 
 ## CSV output - state
 list_state = [x for x in att_state.values()]
-state_keys = list(list_state[0].keys())[:-lk]
-with open('./outputs/state-panel-{time}.csv', 'w') as fp:
-    prep_data.list_dict_panel(list_state,state_keys,config,fp)
+if len(list_state) > 0:
+    state_keys = list(list_state[0].keys())[:-lk]
+    with open('./outputs/state-panel-{time}.csv', 'w') as fp:
+        prep_data.list_dict_panel(list_state,state_keys,config,fp)
 
-for x in config['attribute_cd']:
-    state_keys.extend([f"{{x}}_{{y}}" for y in config['year']])
+    for x in config['attribute_cd']:
+        state_keys.extend([f"{{x}}_{{y}}" for y in config['year']])
 
-with open('./outputs/state-{time}.csv', 'w') as fc:
-    prep_data.list_dict_csv(list_state,state_keys,fc)
+    with open('./outputs/state-{time}.csv', 'w') as fc:
+        prep_data.list_dict_csv(list_state,state_keys,fc)
 """)
 job.close()
 

@@ -69,11 +69,11 @@ for att_cd in config['attribute_cd']:
                     st_invyr[states_cd[states_all.index(st)]] = invyr
                     
                 if tol == 0:
-                    if year in st_invyr[l['state_cd']]:
+                    if str(year) in st_invyr[l['state_cd']]:
                         yr = year
                         cd_yr = [f"{x}{yr}" for x in states_cd]
                     else:
-                        print(f"Warning: Estimate not available for state {i} for year {year}.")
+                        print(f"\n-------- Warning: Estimate not available for state {i} for year {year} --------\n")
                         continue
                 else:
                     cd_yr = []
@@ -149,15 +149,16 @@ with open('./outputs/{file_name}-{time}.json', 'w') as fj:
 ## CSV output
 list_coordinate = [x for x in att_coordinate.values()]
 lk = len(config['attribute_cd']) * len(config['year'])
-keys = list(list_coordinate[0].keys())[:-lk]
-with open('./outputs/{file_name}-panel-{time}.csv', 'w') as fp:
-    prep_data.list_dict_panel(list_coordinate,keys,config,fp)
-
-for x in config['attribute_cd']:
-    keys.extend([f"{{x}}_{{y}}" for y in config['year']])
-
-with open('./outputs/{file_name}-{time}.csv', 'w') as fc:
-    prep_data.list_dict_csv(list_coordinate,keys,fc)
+if len(list_coordinate) > 0:
+    keys = list(list_coordinate[0].keys())[:-lk]
+    with open('./outputs/{file_name}-panel-{time}.csv', 'w') as fp:
+        prep_data.list_dict_panel(list_coordinate,keys,config,fp)
+    
+    for x in config['attribute_cd']:
+        keys.extend([f"{{x}}_{{y}}" for y in config['year']])
+    
+    with open('./outputs/{file_name}-{time}.csv', 'w') as fc:
+        prep_data.list_dict_csv(list_coordinate,keys,fc)
 """)
 job.close()
 
