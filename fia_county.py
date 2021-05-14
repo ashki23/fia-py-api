@@ -127,7 +127,10 @@ for i in json_files:
     
     for j in js_data['EVALIDatorOutput']['row']:
         content = j['content'].split()
-        value = round(j['column'][0]['cellValueNumerator'])
+        try:
+            value = round(j['column'][0]['cellValueNumerator'])
+        except TypeError:
+            continue
         if content[0] == 'Total':
             att_state[state_abb].update({{'state': state_abb, f"{{att_cd}}_{{year}}": value}})
         else:

@@ -24,10 +24,10 @@ rm ${{PROJ_HOME}}/jobid-{file_name}.log
 rm ${{PROJ_HOME}}/serial-{file_name}-log.out
 """)
 
-## Calculating optimal job size
-## opt_job_size find maximum size of each job to satisfy max job num (maxj) 
-opt_job_size = (len(config['attribute_cd']) * len(config['year']) * len(input_data)) / maxj
-job_size = round(opt_job_size) + 1
+## Calculating optimal batch size
+batch_size = max(round((len(config['attribute_cd']) * len(config['year']) * len(input_data)) / maxj), 1)
+if batch_size < len(input_data) and :
+    batch_size += len(input_data) % batch_size + 1
 
 ## Create batch files to download FIA JSON queries
 for att_cd in config['attribute_cd']:
@@ -35,8 +35,9 @@ for att_cd in config['attribute_cd']:
     for year in config['year']:
         i = 0
         nrow = len(input_data)
+        select_row = input_data[i:i + batch_size])
         while i < nrow:
-            print('*************', year, att, 'row: ', i, '-', i + job_size, '***************')
+            print('*************', year, att, 'row: ', i, '-', len(select_row), '***************')
             batch = open(f"./fia_data/job-{file_name}-{att_cd}-{year}-{i}.sh",'w')
             batch.write(f"""#!/bin/bash
 
@@ -46,8 +47,8 @@ for att_cd in config['attribute_cd']:
 #SBATCH --partition={config['partition']}
 #SBATCH --time={config['job_time_hr']}:00:00
             """)
-            lnum = 1
-            for l in input_data[i:i + job_size]:
+            lnum = 0
+            for l in select_row:
                 states_all = [l['state']] + l['neighbors']
                 states_cd = [l['state_cd']] + l['neighbors_cd']
                 
@@ -86,13 +87,13 @@ for att_cd in config['attribute_cd']:
                         yr.append(yr_i)
                     yr = yr[0]
                 
+                lnum += 1
                 file_path = f"${{FIA}}/json/{file_name}_{time}/{att_cd}_{year}_id{l['unit_id']}"
                 batch.write(f"""
-echo "---------------- {file_name}-{att_cd}-{year}-{i} | {lnum} out of {len(input_data[i:i + job_size])}"
+echo "---------------- {file_name}-{att_cd}-{year}-{i} | {lnum} out of {len(select_row)}"
 wget -c --tries=2 --random-wait "https://apps.fs.usda.gov/Evalidator/rest/Evalidator/fullreport?reptype=Circle&lat={l['lat']}&lon={l['lon']}&radius={l['radius']}&snum={att}&sdenom=No denominator - just produce estimates&wc={','.join(cd_yr)}&pselected=None&rselected=All live stocking&cselected=None&ptime=Current&rtime=Current&ctime=Current&wf=&wnum=&wnumdenom=&FIAorRPA=FIADEF&outputFormat=JSON&estOnly=Y&schemaName=FS_FIADB." -O {file_path}_{yr}.json
                 """)
             batch.close()
-            lnum += 1
             
             ## Submit the batch file
             os.system(f"""
@@ -102,7 +103,7 @@ wget -c --tries=2 --random-wait "https://apps.fs.usda.gov/Evalidator/rest/Evalid
             else . ${{FIA}}/job-{file_name}-{att_cd}-{year}-{i}.sh >> ${{PROJ_HOME}}/serial-{file_name}-log.out
             fi
             """)
-            i += job_size
+            i += batch_size
 
 ## Scritp to extract information and generate outputs
 job = open(f"./job_{file_name}.py",'w')
@@ -139,7 +140,10 @@ for i in json_files:
     state = state_inv[0].capitalize()
     state_cd = state_inv[1][:-4]
     year_survey = state_inv[1][2:]
-    value = round(js_data['EVALIDatorOutput']['row'][0]['column'][0]['cellValueNumerator'])
+    try:
+        value = round(js_data['EVALIDatorOutput']['row'][0]['column'][0]['cellValueNumerator'])
+    except TypeError:
+        continue
     att_coordinate[unit_id].update({{'unit_id': unit_id, 'state': state, 'state_cd': state_cd, 'lat': lat, 'lon': lon, 'radius': radius, f"{{att_cd}}_{{year}}": value}})
 
 ## JSON output
