@@ -23,19 +23,19 @@ with open('./state_codes.csv', 'r') as cd:
 ## Select states from the config
 state_cd = prep_data.state_config(state_cd,config)
             
-## Archive old HTMLs
+## Archive old JSONs
 os.system(f"""
-install -dvp ${{FIA}}/html/county_{time}
+install -dvp ${{FIA}}/json/county_{time}
 rm ${{FIA}}/job-county-*
 rm ${{PROJ_HOME}}/jobid-county.log
 rm ${{PROJ_HOME}}/serial-county-log.out
 """)
 
-## Create job files to download FIA HTML queries
+## Create batch files to download FIA JSON queries
 for i in state_cd.keys():
     print('************* state:', i, '***************')
-    job = open(f"./fia_data/job-county-{i}.sh",'w')
-    job.write(f"""#!/bin/bash
+    batch = open(f"./fia_data/job-county-{i}.sh",'w')
+    batch.write(f"""#!/bin/bash
 
 #SBATCH --job-name=county-{i}
 #SBATCH --cpus-per-task=1
@@ -64,19 +64,14 @@ for i in state_cd.keys():
                 yr = invyr[indx]
                 cd_yr.append(f"{state_cd[i]}{yr}")
             
-            file_path = f"${{FIA}}/html/county_{time}/{att_cd}_{year}_{i}"
-            job.write(f"""
+            file_path = f"${{FIA}}/json/county_{time}/{att_cd}_{year}_{i}"
+            batch.write(f"""
 echo "---------------- county-{i}-{year}-{att_cd}"
-wget -c --tries=2 --random-wait "https://apps.fs.usda.gov/Evalidator/rest/Evalidator/fullreport?reptype=State&lat=0&lon=0&radius=0&snum={att}&sdenom=No denominator - just produce estimates&wc={','.join(cd_yr)}&pselected=None&rselected=County code and name&cselected=None&ptime=Current&rtime=Current&ctime=Current&wf=&wnum=&wnumdenom=&FIAorRPA=FIADEF&outputFormat=HTML&estOnly=Y&schemaName=FS_FIADB." -O {file_path}_{yr}.html
-
-if [ -f {file_path}_{yr}.html ]; then
-if ! grep -q {state_cd[i]}{yr} {file_path}_{yr}.html || ! grep -q '>Total<' {file_path}_{yr}.html; then
-rm {file_path}_{yr}.html
-echo "Warning: Extracted data for {att} in state {i} in year {yr} does not include required information."; fi; fi
+wget -c --tries=2 --random-wait "https://apps.fs.usda.gov/Evalidator/rest/Evalidator/fullreport?reptype=State&lat=0&lon=0&radius=0&snum={att}&sdenom=No denominator - just produce estimates&wc={','.join(cd_yr)}&pselected=None&rselected=County code and name&cselected=None&ptime=Current&rtime=Current&ctime=Current&wf=&wnum=&wnumdenom=&FIAorRPA=FIADEF&outputFormat=JSON&estOnly=Y&schemaName=FS_FIADB." -O {file_path}_{yr}.json
             """)
-    job.close()
+    batch.close()
     
-    ## Send the job file to run
+    ## Submit the batch file
     os.system(f"""
     if [ {maxj} -gt 1 ]; then
     JID=$(sbatch --parsable ${{FIA}}/job-county-{i}.sh)
@@ -85,110 +80,97 @@ echo "Warning: Extracted data for {att} in state {i} in year {yr} does not inclu
     fi
     """)
 
-## Create a Bash file to extract level of attributes from FIA HTML files
-print('************* Obtain level of attributes ***************')
-job = open('./fia_data/job-county-html.sh','w')
-job.write(f"""#!/bin/bash
-
-#SBATCH --job-name=Extract
-#SBATCH --mem=4G
-#SBATCH --partition={config['partition']}
-
-echo "success: resources has been allocated"
-cd ${{FIA}}/html/county_{time}
-if [ -f ./county.txt ]; then rm *.txt; fi
-
-for i in *.html; do
-cat $i | grep -Po '(?<=nowrap="nowrap">)\d.*(?=<)' | grep -Po '([0-9]*)' >> ./county_cd.txt
-cat $i | grep -Po '(?<=nowrap="nowrap">)\d.*(?=<)' | grep -Po '([A-Z][a-z].*)' >> ./county.txt
-cat $i | grep -Po '(?<=nowrap="nowrap">)\d.*(?=<)' | grep -Po '([A-Z]{{2}})' >> ./state.txt
-cat $i | grep -P -A 1 '(?<=nowrap="nowrap">)\d.*(?=<)' | grep -Po '(?<=align="right">).*(?=<)' | tr -d , >> ./total.txt
-for l in $(cat $i | grep -Po '(?<=nowrap="nowrap">)\d.*(?=<)' | grep -Po '([0-9]*)'); do echo $i | grep -Po '^\d*(?=_)'; done >> ./att.txt
-for l in $(cat $i | grep -Po '(?<=nowrap="nowrap">)\d.*(?=<)' | grep -Po '([0-9]*)'); do echo $i | grep -Po '(?<=_)\d{{4}}(?=_)'; done >> ./yr.txt
-done
-
-paste -d _ att.txt yr.txt > ./att_yr.txt
-paste -d , county_cd.txt county.txt state.txt yr.txt att_yr.txt total.txt > ./att_level_county.csv
-
-cd ${{PROJ_HOME}}
-""")
-job.close()
-
-## Send the job file to run
-os.system(f"""
-sleep 10
-if [ {maxj} -gt 1 ]; then
-JOBID=$(cat ${{PROJ_HOME}}/jobid-county.log | tr '\n' ',' | grep -Po '.*(?=,)')
-JID=$(sbatch --parsable --dependency=afterok:$(echo ${{JOBID}}) ${{FIA}}/job-county-html.sh)
-echo ${{JID}} > ${{PROJ_HOME}}/jobid-county.log
-else . ${{FIA}}/job-county-html.sh
-fi
-""")
-
-## Create a dictionary of FIA attribute levels for each county
+## Scritp to extract information and generate outputs
 job = open('./job_county.py','w')
 job.write(f"""#!/usr/bin/env python
 
-import re
 import sys
 import csv
 import json
+import glob
 import prep_data
 import collections
 
 config = json.load(open(sys.argv[1]))
-with open('./fia_data/html/county_{time}/att_level_county.csv', 'r') as att:
-    att_data_county = att.readlines()
+json_files = glob.glob('./fia_data/json/county_{time}/*.json')
 
-## Convert CSV to ListDict with RE
-pattern = re.compile('(.*)[,]' * 5 + '(.*)')
-county_data_dict = collections.defaultdict(dict)
-for a in att_data_county:
-    a = a[:-1]
-    t = pattern.search(a)
-    if t is None:
+att_county = collections.defaultdict(dict)
+att_state = collections.defaultdict(dict)
+
+for i in json_files:
+    try:
+        with open(i) as jf:
+            js_data = json.load(jf)
+    except json.decoder.JSONDecodeError:
         continue
-    county_data_dict[t.group(1)].update({{'county_cd': t.group(1), 'county': t.group(2), 'state': t.group(3), t.group(5): t.group(6)}})
 
-county_data = []
-for d in county_data_dict:
-    county_data.append(county_data_dict[d])
+    state_abb = js_data['EVALIDatorOutput']['row'][1]['content'].split()[1].upper()
+    att_cd = js_data['EVALIDatorOutput']['numeratorAttributeNumber']
+    state_inv = js_data['EVALIDatorOutput']['selectedInventories']['stateInventory'].split()
+    state = state_inv[0].capitalize()
+    state_cd = state_inv[1][:-4]
+    year = state_inv[1][2:]
+    
+    for j in js_data['EVALIDatorOutput']['row']:
+        content = j['content'].split()
+        value = round(j['column'][0]['cellValueNumerator'])
+        if content[0] == 'Total':
+            att_state[state_abb].update({{'state': state, f"{{att_cd}}_{{year}}": value}})
+        else:
+            county = content[2].capitalize()
+            att_county[f"{{county}}_{{state_abb}}"].update({{'county_cd': content[0], 'county': county, 'state_abb': state_abb, f"{{att_cd}}_{{year}}": value}})
 
 ## JSON output
 with open('./outputs/county-{time}.json', 'w') as fj:
-    json.dump(county_data, fj)
+    json.dump(att_county, fj)
 
-## CSV output
+with open('./outputs/state-{time}.json', 'w') as fj:
+    json.dump(att_state, fj)
+
+## CSV output - county
+list_county = [x for x in att_county.values()]
 county_keys = ['county_cd','county','state']
 with open('./outputs/county-panel-{time}.csv', 'w') as fp:
-    prep_data.list_dict_panel(county_data,county_keys,config,fp)
+    prep_data.list_dict_panel(list_county,county_keys,config,fp)
 
 for x in config['attribute_cd']:
     county_keys.extend([f"{{x}}_{{y}}" for y in config['year']])
 
 with open('./outputs/county-{time}.csv', 'w') as fc:
-    prep_data.list_dict_csv(county_data,county_keys,fc)
-    
+    prep_data.list_dict_csv(list_county,county_keys,fc)
+
+## CSV output - state
+list_state = [x for x in att_state.values()]
+state_keys = ['state']
+with open('./outputs/state-panel-{time}.csv', 'w') as fp:
+    prep_data.list_dict_panel(list_state,state_keys,config,fp)
+
+for x in config['attribute_cd']:
+    state_keys.extend([f"{{x}}_{{y}}" for y in config['year']])
+
+with open('./outputs/state-{time}.csv', 'w') as fc:
+    prep_data.list_dict_csv(list_state,state_keys,fc)
 """)
 job.close()
 
-## Create a job file
-job = open('./job_county.sh','w')
-job.write(f"""#!/bin/bash
+## Create a batch file
+batch = open('./job_county.sh','w')
+batch.write(f"""#!/bin/bash
 
 #SBATCH --job-name=Output
-#SBATCH --mem=2G
+#SBATCH --mem=8G
 #SBATCH --partition={config['partition']}
 
 python job_county.py config.json
 """)
-job.close()
+batch.close()
 
-## Send the last job to run
+## Submit the batch file
 os.system(f"""
 sleep 5
 if [ {maxj} -gt 1 ]; then
-JID=$(sbatch --parsable --dependency=afterok:$(cat ${{PROJ_HOME}}/jobid-county.log) ${{PROJ_HOME}}/job_county.sh)
+JOBID=$(cat ${{PROJ_HOME}}/jobid-county.log | tr '\n' ',' | grep -Po '.*(?=,)')
+JID=$(sbatch --parsable --dependency=afterok:$(echo ${{JOBID}}) ${{PROJ_HOME}}/job_county.sh)
 echo ${{JID}} > ${{PROJ_HOME}}/jobid-county.log
 else . ${{PROJ_HOME}}/job_county.sh
 fi

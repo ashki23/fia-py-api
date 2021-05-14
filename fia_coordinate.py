@@ -16,9 +16,9 @@ attribute = json.load(open(sys.argv[2]))
 input_data = json.load(open(sys.argv[3]))
 file_name = sys.argv[3].split('.')[0]
 
-## Archive previous HTMLs and remove log files
+## Archive previous JSONs and remove log files
 os.system(f"""
-install -dvp ${{FIA}}/html/{file_name}_{time}
+install -dvp ${{FIA}}/json/{file_name}_{time}
 rm ${{FIA}}/job-{file_name}-*
 rm ${{PROJ_HOME}}/jobid-{file_name}.log
 rm ${{PROJ_HOME}}/serial-{file_name}-log.out
@@ -29,7 +29,7 @@ rm ${{PROJ_HOME}}/serial-{file_name}-log.out
 opt_job_size = (len(config['attribute_cd']) * len(config['year']) * len(input_data)) / maxj
 job_size = round(opt_job_size) + 1
 
-## Create job files to download FIA HTML queries
+## Create batch files to download FIA JSON queries
 for att_cd in config['attribute_cd']:
     att = attribute[str(att_cd)]
     for year in config['year']:
@@ -37,8 +37,8 @@ for att_cd in config['attribute_cd']:
         nrow = len(input_data)
         while i < nrow:
             print('*************', year, att, 'row: ', i, '-', i + job_size, '***************')
-            job = open(f"./fia_data/job-{file_name}-{att_cd}-{year}-{i}.sh",'w')
-            job.write(f"""#!/bin/bash
+            batch = open(f"./fia_data/job-{file_name}-{att_cd}-{year}-{i}.sh",'w')
+            batch.write(f"""#!/bin/bash
 
 #SBATCH --job-name={file_name}-{att_cd}-{year}-{i}
 #SBATCH --cpus-per-task=1
@@ -74,20 +74,15 @@ for att_cd in config['attribute_cd']:
                         yr.append(yr_i)
                     yr = yr[0]
                 
-                file_path = f"${{FIA}}/html/{file_name}_{time}/{att_cd}_{year}_id{l['unit_id']}"
-                job.write(f"""
+                file_path = f"${{FIA}}/json/{file_name}_{time}/{att_cd}_{year}_id{l['unit_id']}"
+                batch.write(f"""
 echo "---------------- {file_name}-{att_cd}-{year}-{i} | {lnum} out of {len(input_data[i:i + job_size])}"
-wget -c --tries=2 --random-wait "https://apps.fs.usda.gov/Evalidator/rest/Evalidator/fullreport?reptype=Circle&lat={l['lat']}&lon={l['lon']}&radius={l['radius']}&snum={att}&sdenom=No denominator - just produce estimates&wc={','.join(cd_yr)}&pselected=None&rselected=All live stocking&cselected=None&ptime=Current&rtime=Current&ctime=Current&wf=&wnum=&wnumdenom=&FIAorRPA=FIADEF&outputFormat=HTML&estOnly=Y&schemaName=FS_FIADB." -O {file_path}_{yr}.html
-
-if [ -f {file_path}_{yr}.html ]; then
-if ! grep -q {l['state_cd']}{yr} {file_path}_{yr}.html || ! grep -q '>Total<' {file_path}_{yr}.html; then
-rm {file_path}_{yr}.html
-echo "Warning: Extracted data for {att} in state {l['state']} in year {yr} does not include required information."; fi; fi
+wget -c --tries=2 --random-wait "https://apps.fs.usda.gov/Evalidator/rest/Evalidator/fullreport?reptype=Circle&lat={l['lat']}&lon={l['lon']}&radius={l['radius']}&snum={att}&sdenom=No denominator - just produce estimates&wc={','.join(cd_yr)}&pselected=None&rselected=All live stocking&cselected=None&ptime=Current&rtime=Current&ctime=Current&wf=&wnum=&wnumdenom=&FIAorRPA=FIADEF&outputFormat=JSON&estOnly=Y&schemaName=FS_FIADB." -O {file_path}_{yr}.json
                 """)
-            job.close()
+            batch.close()
             lnum += 1
             
-            ## Send the job file to run
+            ## Submit the batch file
             os.system(f"""
             if [ {maxj} -gt 1 ]; then
             JID=$(sbatch --parsable ${{FIA}}/job-{file_name}-{att_cd}-{year}-{i}.sh)
@@ -97,98 +92,60 @@ echo "Warning: Extracted data for {att} in state {l['state']} in year {yr} does 
             """)
             i += job_size
 
-## Create a Bash file to extract level of attributes from FIA HTML
-print('************* Obtain level of attributes ***************')
-job = open(f"./fia_data/job-{file_name}-html.sh",'w')
-job.write(f"""#!/bin/bash
-
-#SBATCH --job-name=Extract
-#SBATCH --mem=16G
-#SBATCH --partition={config['partition']}
-
-echo "success: resources has been allocated"
-cd ${{FIA}}/html/{file_name}_{time}
-if [ -f ./year.txt ]; then rm *.txt; fi
-
-for i in *.html; do
-echo $i | grep -Po '^\d*(?=_)' >> ./att.txt
-echo $i | grep -Po '(?<=id)\d*(?=_)' >> ./unit_id.txt
-echo $i | grep -Po '(?<=_)\d{{4}}(?=_.)' >> ./year.txt
-cat $i | grep -A 1 'nowrap="nowrap">Total</th>' | tr -d , | grep -Po '\d*' >> ./att_total.txt
-done
-
-paste -d _ att.txt year.txt > ./att_year.txt
-paste -d , unit_id.txt year.txt att_year.txt att_total.txt > ./att_level_{file_name}.csv
-
-cd ${{PROJ_HOME}}
-""")
-job.close()
-
-## Send the job file to run
-os.system(f"""
-sleep 5
-if [ {maxj} -gt 1 ]; then
-JOBID=$(cat ${{PROJ_HOME}}/jobid-{file_name}.log | tr '\n' ',' | grep -Po '.*(?=,)')
-JID=$(sbatch --parsable --dependency=afterok:$(echo ${{JOBID}}) ${{FIA}}/job-{file_name}-html.sh)
-echo ${{JID}} > ${{PROJ_HOME}}/jobid-{file_name}.log
-else . ${{FIA}}/job-{file_name}-html.sh
-fi
-""")
-
-## Create a dictionary of FIA attribute levels for each coordinate
+## Scritp to extract information and generate outputs
 job = open(f"./job_{file_name}.py",'w')
 job.write(f"""#!/usr/bin/env python
 
-import re
 import sys
 import csv
 import json
+import glob
 import prep_data
 import collections
 
 config = json.load(open(sys.argv[1]))
-{file_name}_data = json.load(open(sys.argv[2]))
+json_files = glob.glob('./fia_data/json/{file_name}_{time}/*.json')
+att_coordinate = collections.defaultdict(dict)
 
-## Read level of attributes from CSV
-with open('./fia_data/html/{file_name}_{time}/att_level_{file_name}.csv', 'r') as att:
-    att_data = att.readlines()
-
-## Convert CSV to ListDict with RE
-pattern = re.compile('(.*)[,]' * 3 + '(.*)')
-att_{file_name} = collections.defaultdict(dict)
-for a in att_data:
-    a = a[:-1]
-    t = pattern.search(a)
-    if t is None:
+for i in json_files:
+    try:
+        with open(i) as jf:
+            js_data = json.load(jf)
+    except json.decoder.JSONDecodeError:
         continue
-    att_{file_name}[t.group(1)].update({{t.group(3): t.group(4)}})
 
-## Add the attribite levels to {file_name}_data
-for l in {file_name}_data:
-    levels = att_{file_name}[l['unit_id']]
-    for k in levels.keys():
-        l[k] = levels[k]
+    lat = js_data['EVALIDatorOutput']['circleLatitude']
+    lon = js_data['EVALIDatorOutput']['circleLongitude']
+    radius = js_data['EVALIDatorOutput']['circleRadiusMiles']
+    att_cd = js_data['EVALIDatorOutput']['numeratorAttributeNumber']
+    state_inv = list(js_data['EVALIDatorOutput']['selectedInventories']['stateInventory'])[0].split()
+    unit_id = (str(lat).replace('.','') + str(lon).replace('.','').replace('-',''))[:8]
+    state = state_inv[0].capitalize()
+    state_cd = state_inv[1][:-4]
+    year = state_inv[1][2:]
+    value = round(js_data['EVALIDatorOutput']['row'][0]['column'][0]['cellValueNumerator'])
+    att_coordinate[unit_id].update({{'unit_id': unit_id, 'state': state, 'state_cd': state_cd, 'lat': lat, 'lon': lon, 'radius': radius, f"{{att_cd}}_{{year}}": value}})
 
 ## JSON output
 with open('./outputs/{file_name}-{time}.json', 'w') as fj:
-    json.dump({file_name}_data, fj)
+    json.dump(att_coordinate, fj)
 
 ## CSV output
+list_coordinate = [x for x in att_coordinate.values()]
 lk = len(config['attribute_cd']) * len(config['year'])
-keys = list({file_name}_data[0].keys())[:-lk]
+keys = list(list_coordinate[0].keys())[:-lk]
 with open('./outputs/{file_name}-panel-{time}.csv', 'w') as fp:
-    prep_data.list_dict_panel({file_name}_data,keys,config,fp)
+    prep_data.list_dict_panel(list_coordinate,keys,config,fp)
 
 for x in config['attribute_cd']:
     keys.extend([f"{{x}}_{{y}}" for y in config['year']])
 
 with open('./outputs/{file_name}-{time}.csv', 'w') as fc:
-    prep_data.list_dict_csv({file_name}_data,keys,fc)
-
+    prep_data.list_dict_csv(list_coordinate,keys,fc)
 """)
 job.close()
 
-## Create a job file
+## Create a batch file
 job = open(f"./job_{file_name}.sh",'w')
 job.write(f"""#!/bin/bash
 
@@ -196,15 +153,16 @@ job.write(f"""#!/bin/bash
 #SBATCH --mem=8G
 #SBATCH --partition={config['partition']}
 
-python job_{file_name}.py config.json {file_name}.json
+python job_{file_name}.py config.json
 """)
 job.close()
 
-## Send the last job to run
+## Submit the batch file
 os.system(f"""
 sleep 5
 if [ {maxj} -gt 1 ]; then
-JID=$(sbatch --parsable --dependency=afterok:$(cat ${{PROJ_HOME}}/jobid-{file_name}.log) ${{PROJ_HOME}}/job_{file_name}.sh)
+JOBID=$(cat ${{PROJ_HOME}}/jobid-{file_name}.log | tr '\n' ',' | grep -Po '.*(?=,)')
+JID=$(sbatch --parsable --dependency=afterok:$(echo ${{JOBID}}) ${{PROJ_HOME}}/job_{file_name}.sh)
 echo ${{JID}} > ${{PROJ_HOME}}/jobid-{file_name}.log
 else . ${{PROJ_HOME}}/job_{file_name}.sh
 fi
