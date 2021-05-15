@@ -16,9 +16,10 @@ attribute = json.load(open(sys.argv[2]))
 input_data = json.load(open(sys.argv[3]))
 file_name = sys.argv[3].split('.')[0]
 
-## Archive previous JSONs and remove log files
+## Create a new directory and and remove log files
 os.system(f"""
 install -dvp ${{FIA}}/json/{file_name}_{time}
+find ${{FIA}}/json/{file_name}_{time} -size 0 -delete")
 rm ${{FIA}}/job-{file_name}-*
 rm ${{PROJ_HOME}}/jobid-{file_name}.log
 rm ${{PROJ_HOME}}/serial-{file_name}-log.out
@@ -91,7 +92,9 @@ for att_cd in config['attribute_cd']:
                 file_path = f"${{FIA}}/json/{file_name}_{time}/{att_cd}_{year}_id{l['unit_id']}"
                 batch.write(f"""
 echo "---------------- {file_name}-{att_cd}-{year}-{i} | {lnum} out of {len(select_row)}"
+if [ ! -f {file_path}_{yr}.json ]; then
 wget -c --tries=2 --random-wait "https://apps.fs.usda.gov/Evalidator/rest/Evalidator/fullreport?reptype=Circle&lat={l['lat']}&lon={l['lon']}&radius={l['radius']}&snum={att}&sdenom=No denominator - just produce estimates&wc={','.join(cd_yr)}&pselected=None&rselected=All live stocking&cselected=None&ptime=Current&rtime=Current&ctime=Current&wf=&wnum=&wnumdenom=&FIAorRPA=FIADEF&outputFormat=JSON&estOnly=Y&schemaName=FS_FIADB." -O {file_path}_{yr}.json
+fi
                 """)
             batch.close()
             
@@ -119,6 +122,7 @@ import prep_data
 import collections
 
 config = json.load(open(sys.argv[1]))
+os.system("find ./fia_data/json/{file_name}_{time} -size 0 -delete")
 json_files = glob.glob('./fia_data/json/{file_name}_{time}/*.json')
 att_coordinate = collections.defaultdict(dict)
 

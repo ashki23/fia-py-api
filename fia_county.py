@@ -23,9 +23,10 @@ with open('./state_codes.csv', 'r') as cd:
 ## Select states from the config
 state_cd = prep_data.state_config(state_cd,config)
             
-## Archive old JSONs
+## Create a new directory and and remove log files
 os.system(f"""
 install -dvp ${{FIA}}/json/county_{time}
+find ${{FIA}}/json/county_{time} -size 0 -delete")
 rm ${{FIA}}/job-county-*
 rm ${{PROJ_HOME}}/jobid-county.log
 rm ${{PROJ_HOME}}/serial-county-log.out
@@ -77,7 +78,9 @@ for i in state_cd.keys():
             file_path = f"${{FIA}}/json/county_{time}/{att_cd}_{year}_{i}"
             batch.write(f"""
 echo "---------------- county-{i}-{year}-{att_cd}"
+if [ ! -f {file_path}_{yr}.json ]; then
 wget -c --tries=2 --random-wait "https://apps.fs.usda.gov/Evalidator/rest/Evalidator/fullreport?reptype=State&lat=0&lon=0&radius=0&snum={att}&sdenom=No denominator - just produce estimates&wc={','.join(cd_yr)}&pselected=None&rselected=County code and name&cselected=None&ptime=Current&rtime=Current&ctime=Current&wf=&wnum=&wnumdenom=&FIAorRPA=FIADEF&outputFormat=JSON&estOnly=Y&schemaName=FS_FIADB." -O {file_path}_{yr}.json
+fi
             """)
     batch.close()
     
@@ -104,6 +107,7 @@ import prep_data
 import collections
 
 config = json.load(open(sys.argv[1]))
+os.system("find ./fia_data/json/county_{time} -size 0 -delete")
 json_files = glob.glob('./fia_data/json/county_{time}/*.json')
 
 att_county = collections.defaultdict(dict)
