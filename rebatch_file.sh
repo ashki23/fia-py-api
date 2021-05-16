@@ -1,23 +1,18 @@
 #!/bin/bash
 
-read -p 'Select the query type (insert one of state, county or coordinate): ' query_name
+read -p "Select the query type (i.e. state, county, or coordinate): " query_name
 
 ## Set env variables 
 source environment.sh
-
-## Remove log
-rm ${PROJ_HOME}/jobid-failed-${query_name}.log
-
-## Collecting failed and timeout job's name in the last 24 hours
-sacct -XP --state F,TO --noheader --starttime $(date --date='day ago' +"%Y-%m-%d") --format JobName | grep "${query_name}" > ${PROJ_HOME}/failed-jobs-${query_name}.txt
+echo ============ Rebatch time: $(date +"%Y-%m-%d-%H:%M")
 
 ## Resubmit the failed jobs
-for j in `cat ${PROJ_HOME}/failed-jobs-${query_name}.txt`; do 
+for j in $(cat ${PROJ_HOME}/job_out_${query_name}/failed.txt); do
 JID=$(sbatch --parseable ${FIA}/job-${j}.sh)
-echo ${JID} >> ${PROJ_HOME}/jobid-failed-${query_name}.log
+echo ${JID} >> ${PROJ_HOME}/jobid-${query_name}-rebatch.log
 done
 
 ## Re-extract informations from JSON files
 sleep 3
-JOBID=$(cat ${PROJ_HOME}/jobid-failed-${query_name}.log | tr '\n' ',' | grep -Po '.*(?=,)')
+JOBID=$(cat ${PROJ_HOME}/jobid-${query_name}-rebatch.log | tr '\n' ',' | grep -Po '.*(?=,$)')
 sbatch --parsable --dependency=afterok:$(echo ${JOBID}) ${PROJ_HOME}/job_${query_name}.sh

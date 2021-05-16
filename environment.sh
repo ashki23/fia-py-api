@@ -30,6 +30,6 @@ conda activate ./api_py_env
 pip install geocoder
 fi
 
-## Activate and update Python environment
+## Activate Python environment
 conda activate ./api_py_env
 export HOME=${MYHOME}
