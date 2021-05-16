@@ -6,7 +6,8 @@ import time
 import json
 
 ## Time
-time = time.strftime("%Y%m%d-%H%M%S")
+time_pt = time.strftime("%Y%m%d-%H%M%S")
+time_ptr = time.strftime("%Y-%m-%d-%H:%M", time.strptime(time_pt,"%Y%m%d-%H%M%S"))
 
 ## Open JSON inputs
 config = json.load(open(sys.argv[1]))
@@ -18,16 +19,18 @@ file_name = sys.argv[3].split('.')[0]
 
 ## Create a new directory and and remove log files
 os.system(f"""
-install -dvp ${{FIA}}/json/{file_name}_{time}
-find ${{FIA}}/json/{file_name}_{time} -size 0 -delete")
+install -dvp ${{FIA}}/json/{file_name}_{time_pt}
+install -dvp ${{PROJ_HOME}}/job_out_{file_name}/archive/{time_pt}
 rm ${{FIA}}/job-{file_name}-*
 rm ${{PROJ_HOME}}/jobid-{file_name}.log
 rm ${{PROJ_HOME}}/serial-{file_name}-log.out
+mv ${{PROJ_HOME}}/job_out_{file_name}/*.* ${{PROJ_HOME}}/job_out_{file_name}/archive/{time_pt}/.
 """)
 
 ## Calculating optimal batch size
-batch_size = max(round((len(config['attribute_cd']) * len(config['year']) * len(input_data)) / maxj), 1)
-if batch_size < len(input_data) and :
+num_query = len(config['attribute_cd']) * len(config['year']) * len(input_data)
+batch_size = max(round(num_query / maxj), 1)
+if batch_size < len(input_data):
     batch_size += len(input_data) % batch_size + 1
 
 ## Create batch files to download FIA JSON queries
@@ -36,7 +39,7 @@ for att_cd in config['attribute_cd']:
     for year in config['year']:
         i = 0
         nrow = len(input_data)
-        select_row = input_data[i:i + batch_size])
+        select_row = input_data[i:i + batch_size]
         while i < nrow:
             print('*************', year, att, 'row: ', i, '-', len(select_row), '***************')
             batch = open(f"./fia_data/job-{file_name}-{att_cd}-{year}-{i}.sh",'w')
@@ -47,6 +50,7 @@ for att_cd in config['attribute_cd']:
 #SBATCH --mem=1G
 #SBATCH --partition={config['partition']}
 #SBATCH --time={config['job_time_hr']}:00:00
+#SBATCH --output ${{PROJ_HOME}}/job_out_{file_name}/{file_name}-{att_cd}-{year}-{i}_%j.out
             """)
             lnum = 0
             for l in select_row:
@@ -59,7 +63,7 @@ for att_cd in config['attribute_cd']:
                     if [ ! -f ./fia_data/survey/{st}_POP_STRATUM.csv ]; then
                     wget -c -nv --tries=2 https://apps.fs.usda.gov/fia/datamart/CSV/{st}_POP_STRATUM.csv -P ./fia_data/survey
                     fi
-                    cat ./fia_data/survey/{st}_POP_STRATUM.csv | awk -F , '{{print $4}}' | grep ".*01$" | sort | uniq
+                    awk -F , '{{print $4}}' ./fia_data/survey/{st}_POP_STRATUM.csv | grep ".*01$" | sort | uniq
                     """).read()[:-1].split('\n')
                     
                     if len(invyr_id[0]) == 6:
@@ -67,7 +71,7 @@ for att_cd in config['attribute_cd']:
                     else:
                         in_yr = [x[1:-2] for x in invyr_id]
                     
-                    invyr = [f"20{x}" for x in in_yr if int(x) < int(time[2:4])] + [f"19{x}" for x in in_yr if int(x) > int(time[2:4])]
+                    invyr = [f"20{x}" for x in in_yr if int(x) < int(time_pt[2:4])] + [f"19{x}" for x in in_yr if int(x) > int(time_pt[2:4])]
                     st_invyr[states_cd[states_all.index(st)]] = invyr
                     
                 if tol == 0:
@@ -89,7 +93,7 @@ for att_cd in config['attribute_cd']:
                     yr = yr[0]
                 
                 lnum += 1
-                file_path = f"${{FIA}}/json/{file_name}_{time}/{att_cd}_{year}_id{l['unit_id']}"
+                file_path = f"${{FIA}}/json/{file_name}_{time_pt}/{att_cd}_{year}_id{l['unit_id']}"
                 batch.write(f"""
 echo "---------------- {file_name}-{att_cd}-{year}-{i} | {lnum} out of {len(select_row)}"
 if [ ! -f {file_path}_{yr}.json ]; then
@@ -103,13 +107,13 @@ fi
             if [ {maxj} -gt 1 ]; then
             JID=$(sbatch --parsable ${{FIA}}/job-{file_name}-{att_cd}-{year}-{i}.sh)
             echo ${{JID}} >> ${{PROJ_HOME}}/jobid-{file_name}.log
-            else . ${{FIA}}/job-{file_name}-{att_cd}-{year}-{i}.sh >> ${{PROJ_HOME}}/serial-{file_name}-log.out
+            else . ${{FIA}}/job-{file_name}-{att_cd}-{year}-{i}.sh > ${{PROJ_HOME}}/job_out_{file_name}/{file_name}-{att_cd}-{year}-{i}.out
             fi
             """)
             i += batch_size
 
 ## Scritp to extract information and generate outputs
-job = open(f"./job_{file_name}.py",'w')
+job = open(f"./job-{file_name}.py",'w')
 job.write(f"""#!/usr/bin/env python
 
 import re
@@ -122,8 +126,7 @@ import prep_data
 import collections
 
 config = json.load(open(sys.argv[1]))
-os.system("find ./fia_data/json/{file_name}_{time} -size 0 -delete")
-json_files = glob.glob('./fia_data/json/{file_name}_{time}/*.json')
+json_files = glob.glob('./fia_data/json/{file_name}_{time_pt}/*.json')
 att_coordinate = collections.defaultdict(dict)
 
 for i in json_files:
@@ -135,23 +138,23 @@ for i in json_files:
 
     n = os.path.basename(i)
     year = re.findall('(?<=_)\d{{4}}(?=_.)', i)[0]
+    unit_id = re.findall('(?<=id)\d*(?=_)', i)[0]
     lat = js_data['EVALIDatorOutput']['circleLatitude']
     lon = js_data['EVALIDatorOutput']['circleLongitude']
     radius = js_data['EVALIDatorOutput']['circleRadiusMiles']
     att_cd = js_data['EVALIDatorOutput']['numeratorAttributeNumber']
     state_inv = list(js_data['EVALIDatorOutput']['selectedInventories']['stateInventory'])[0].split()
-    unit_id = (str(lat).replace('.','') + str(lon).replace('.','').replace('-',''))[:8]
     state = state_inv[0].capitalize()
     state_cd = state_inv[1][:-4]
     year_survey = state_inv[1][2:]
     try:
         value = round(js_data['EVALIDatorOutput']['row'][0]['column'][0]['cellValueNumerator'])
-    except TypeError:
+    except (TypeError, KeyError):
         continue
-    att_coordinate[unit_id].update({{'unit_id': unit_id, 'state': state, 'state_cd': state_cd, 'lat': lat, 'lon': lon, 'radius': radius, f"{{att_cd}}_{{year}}": value}})
+    att_coordinate[unit_id].update({{'unit_id': uniq_id, 'state': state, 'state_cd': state_cd, 'lat': lat, 'lon': lon, 'radius': radius, f"{{att_cd}}_{{year}}": value}})
 
 ## JSON output
-with open('./outputs/{file_name}-{time}.json', 'w') as fj:
+with open('./outputs/{file_name}-{time_pt}.json', 'w') as fj:
     json.dump(att_coordinate, fj)
 
 ## CSV output
@@ -159,37 +162,96 @@ list_coordinate = [x for x in att_coordinate.values()]
 lk = len(config['attribute_cd']) * len(config['year'])
 if len(list_coordinate) > 0:
     keys = list(list_coordinate[0].keys())[:-lk]
-    with open('./outputs/{file_name}-panel-{time}.csv', 'w') as fp:
+    with open('./outputs/{file_name}-panel-{time_pt}.csv', 'w') as fp:
         prep_data.list_dict_panel(list_coordinate,keys,config,fp)
     
     for x in config['attribute_cd']:
         keys.extend([f"{{x}}_{{y}}" for y in config['year']])
     
-    with open('./outputs/{file_name}-{time}.csv', 'w') as fc:
+    with open('./outputs/{file_name}-{time_pt}.csv', 'w') as fc:
         prep_data.list_dict_csv(list_coordinate,keys,fc)
 """)
 job.close()
 
-## Create a batch file
-job = open(f"./job_{file_name}.sh",'w')
-job.write(f"""#!/bin/bash
+## Create a batch file to run the Python job
+batch = open(f"./job-{file_name}.sh",'w')
+batch.write(f"""#!/bin/bash
 
-#SBATCH --job-name=Output
+#SBATCH --job-name=Output-{file_name}
 #SBATCH --mem=8G
 #SBATCH --partition={config['partition']}
+#SBATCH --output ${{PROJ_HOME}}/job_out_{file_name}/{file_name}_%j.out
 
-python job_{file_name}.py config.json
+python job-{file_name}.py config.json
 """)
-job.close()
+batch.close()
 
 ## Submit the batch file
 os.system(f"""
-sleep 5
+sleep 3
 if [ {maxj} -gt 1 ]; then
-JOBID=$(cat ${{PROJ_HOME}}/jobid-{file_name}.log | tr '\n' ',' | grep -Po '.*(?=,)')
-JID=$(sbatch --parsable --dependency=afterok:$(echo ${{JOBID}}) ${{PROJ_HOME}}/job_{file_name}.sh)
-echo ${{JID}} > ${{PROJ_HOME}}/jobid-{file_name}.log
-else . ${{PROJ_HOME}}/job_{file_name}.sh
+JOBID=$(cat ${{PROJ_HOME}}/jobid-{file_name}.log | tr '\n' ',' | grep -Po '.*(?=,$)')
+JID=$(sbatch --parsable --dependency=afterok:$(echo ${{JOBID}}) ${{PROJ_HOME}}/job-{file_name}.sh)
+echo ${{JID}} >> ${{PROJ_HOME}}/jobid-{file_name}.log
+else . ${{PROJ_HOME}}/job-{file_name}.sh
 fi
-sleep 5
+sleep 3
+""")
+
+## Create a batch file to collect reports
+report = open(f"./report-{file_name}.sh",'w')
+report.write(f"""#!/bin/bash
+
+#SBATCH --job-name=Report-{file_name}
+#SBATCH --mem=4G
+#SBATCH --partition={config['partition']}
+#SBATCH --output ${{PROJ_HOME}}/report-{file_name}-%j.out
+
+## Collect jobs with ERROR
+for i in `ls ${{PROJ_HOME}}/job_out_{file_name}/*.out`; do
+    if grep -iq "ERROR" $i ; then
+        echo $i | grep -Po "(?<=job_out_{file_name}/).*(?=_.*.out$)" >> ${{PROJ_HOME}}/job_out_{file_name}/failed-temp.txt
+    fi
+done
+
+if [ `jq ."job_number_max" config.json` -gt 1 ]; then
+## Collecting failed and timeout Slurm jobs
+sacct -XP --state F,TO --noheader --starttime {time_ptr} --format JobName | grep "{file_name}" >> ${{PROJ_HOME}}/job_out_{file_name}/failed-temp.txt
+fi
+
+sort ${{PROJ_HOME}}/job_out_{file_name}/failed-temp.txt | uniq > ${{PROJ_HOME}}/job_out_{file_name}/failed.txt
+rm ${{PROJ_HOME}}/job_out_{file_name}/failed-temp.txt
+sleep 1
+
+echo "-----------------------------------------------------------------------------------
+Job(s) start time: {time_ptr}
+Number of queries: {num_query}
+Number of jobs: `ls ${{PROJ_HOME}}/job_out_county/*.out | wc -l`
+Number of failed jobs: `cat ${{PROJ_HOME}}/job_out_county/failed.txt | wc -l`"
+
+if [ `cat ${{PROJ_HOME}}/job_out_county/failed.txt | wc -l` -gt 0 ]; then
+echo "
+Find failed jobs' name in '${{PROJ_HOME}}/job_out_county/failed.txt'
+Failure can be relared to:
+
+      - EVALIDator and the FIADB may be unavailable during this time
+      - Config file inputs may be unvaild
+      - Input coordinates may be unvalid (for the 'coodinate' query type)
+      - Slurm job failure
+
+If the failure is related to Slurm jobs, consider to run 'rebatch_file.sh' file to resubmit the failed jobs."
+fi
+
+echo -----------------------------------------------------------------------------------
+""")
+report.close()
+
+## Submit the batch file
+os.system(f"""
+sleep 3
+if [ {maxj} -gt 1 ]; then
+JOBID=$(tail -n 1 ${{PROJ_HOME}}/jobid-{file_name}.log)
+sbatch --parsable --dependency=afterok:$(echo ${{JOBID}}) ${{PROJ_HOME}}/report-{file_name}.sh
+else . ${{PROJ_HOME}}/report-{file_name}.sh
+fi
 """)
