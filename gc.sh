@@ -6,9 +6,10 @@ if [ $answer = "yes" ]; then
     rm -v ./Miniconda3*
     rm -v ./job-*
     rm -v ./jobid-*
+    rm -v ./slurm-*.out
     rm -v ./report-*
-    rm -rv ./job_out_*
-    rm -rv ./fia_data
-else 
+    rm -r ./job_out_* && echo "'/job_out_*' directories were removed"
+    rm -r ./fia_data && echo "'./fia_data' directory was removed"
+else
     return
 fi

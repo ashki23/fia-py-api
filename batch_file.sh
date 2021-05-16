@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH --job-name=API_Biomass
+#SBATCH --job-name=API_Runner
 #SBATCH --cpus-per-task=1
 #SBATCH --mem=16G
 
