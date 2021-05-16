@@ -211,10 +211,10 @@ sleep 3
 report = open(f"./report-county.sh",'w')
 report.write(f"""#!/bin/bash
 
-#SBATCH --job-name=Report-county
+#SBATCH --job-name=Report-state-county
 #SBATCH --mem=4G
 #SBATCH --partition={config['partition']}
-#SBATCH --output ./report-county-%j.out
+#SBATCH --output ./report-state-county-%j.out
 
 ## Collect jobs with error
 for i in `ls ${{PROJ_HOME}}/job_out_county/county-*.out`; do
@@ -254,7 +254,7 @@ Failure can be relared to:
       - Input coordinates may be unvalid (for the 'coodinate' query type)
       - Slurm job failure
 
-If the failure is related to EVALIDator servers or Slurm jobs, consider to run 'rebatch_file.sh' file to resubmit the failed jobs. Otherwise, modify config file and/or input files and resubmit the 'batch_file.sh'."
+Make sure EVALIDator servers is available and config file and/or input files are valid and consider to resubmit the 'batch_file.sh'."
 fi
 
 echo -----------------------------------------------------------------------------------
@@ -267,6 +267,6 @@ sleep 3
 if [ {maxj} -gt 1 ]; then
 JOBID=$(tail -n 1 ${{PROJ_HOME}}/jobid-county.log)
 sbatch --parsable --dependency=afterok:$(echo ${{JOBID}}) ${{PROJ_HOME}}/report-county.sh
-else . ${{PROJ_HOME}}/report-county.sh > ${{PROJ_HOME}}/report-county-serial.out
+else . ${{PROJ_HOME}}/report-county.sh > ${{PROJ_HOME}}/report-state-county-serial.out
 fi
 """)

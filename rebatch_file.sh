@@ -1,8 +1,8 @@
 #!/bin/bash
 
-read -p "Select the query type (i.e. state, county, or coordinate): " query_name
+read -p "Select the query type (i.e. coordinate): " query_name
 
-## Set env variables 
+## Set env variables
 source environment.sh
 echo ============ Rebatch time: $(date +"%Y-%m-%d-%H:%M")
 
