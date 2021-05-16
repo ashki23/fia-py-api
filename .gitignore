@@ -1,13 +1,12 @@
 *_env*
 __pycache__/
-pellet_plants/
 other_data/
 fia_data/
 outputs/
+job_out*/
 miniconda/
 .conda/
 .cache/
-.ipynb_checkpoints/
 Miniconda3-latest-Linux-x86_64.sh
 job*
 report*
@@ -16,3 +15,5 @@ report*
 *.csv
 *.out
 *.log
+*.pdf
+*.html

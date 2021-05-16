@@ -195,7 +195,7 @@ if [ {maxj} -gt 1 ]; then
 JOBID=$(cat ${{PROJ_HOME}}/jobid-{file_name}.log | tr '\n' ',' | grep -Po '.*(?=,$)')
 JID=$(sbatch --parsable --dependency=afterok:$(echo ${{JOBID}}) ${{PROJ_HOME}}/job-{file_name}.sh)
 echo ${{JID}} >> ${{PROJ_HOME}}/jobid-{file_name}.log
-else . ${{PROJ_HOME}}/job-{file_name}.sh
+else . ${{PROJ_HOME}}/job-{file_name}.sh > ${{PROJ_HOME}}/job_out_{file_name}/output_serial.out
 fi
 sleep 3
 """)
@@ -221,20 +221,20 @@ if [ `jq ."job_number_max" config.json` -gt 1 ]; then
 sacct -XP --state F,TO --noheader --starttime {time_ptr} --format JobName | grep "{file_name}" >> ${{PROJ_HOME}}/job_out_{file_name}/failed-temp.txt
 fi
 
+sleep 1
 sort ${{PROJ_HOME}}/job_out_{file_name}/failed-temp.txt | uniq > ${{PROJ_HOME}}/job_out_{file_name}/failed.txt
 rm ${{PROJ_HOME}}/job_out_{file_name}/failed-temp.txt
 
 ## Collect warnings
-grep -i "warning" ${{PROJ_HOME}}/job_out_{file_name}/output_*.out > > ${{PROJ_HOME}}/job_out_{file_name}/warning.txt
-
-sleep 3
+grep -i "warning" ${{PROJ_HOME}}/job_out_{file_name}/output_*.out > ${{PROJ_HOME}}/job_out_{file_name}/warning.txt
+sleep 1
 
 echo "-----------------------------------------------------------------------------------
 Job(s) start time: {time_ptr}
 Number of queries: {num_query}
 Number of jobs: `ls ${{PROJ_HOME}}/job_out_{file_name}/*.out | wc -l`
-Number of failed jobs: `cat ${{PROJ_HOME}}/job_out_{file_name}/failed.txt | wc -l`"
-Number of warnings (./job_out_{file_name}/warning.txt): `cat ${{PROJ_HOME}}/job_out_{file_name}/warning.txt | wc -l`"
+Number of failed jobs: `cat ${{PROJ_HOME}}/job_out_{file_name}/failed.txt | wc -l`
+Number of warnings ('./job_out_{file_name}/warning.txt'): `cat ${{PROJ_HOME}}/job_out_{file_name}/warning.txt | wc -l`"
 
 if [ `cat ${{PROJ_HOME}}/job_out_{file_name}/failed.txt | wc -l` -gt 0 ]; then
 echo "
@@ -260,6 +260,6 @@ sleep 3
 if [ {maxj} -gt 1 ]; then
 JOBID=$(tail -n 1 ${{PROJ_HOME}}/jobid-{file_name}.log)
 sbatch --parsable --dependency=afterok:$(echo ${{JOBID}}) ${{PROJ_HOME}}/report-{file_name}.sh
-else . ${{PROJ_HOME}}/report-{file_name}.sh
+else . ${{PROJ_HOME}}/report-{file_name}.sh > ${{PROJ_HOME}}/report-{file_name}-serial.out
 fi
 """)

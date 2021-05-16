@@ -202,7 +202,7 @@ if [ {maxj} -gt 1 ]; then
 JOBID=$(cat ${{PROJ_HOME}}/jobid-county.log | tr '\n' ',' | grep -Po '.*(?=,$)')
 JID=$(sbatch --parsable --dependency=afterok:$(echo ${{JOBID}}) ${{PROJ_HOME}}/job-county.sh)
 echo ${{JID}} >> ${{PROJ_HOME}}/jobid-county.log
-else . ${{PROJ_HOME}}/job-county.sh
+else . ${{PROJ_HOME}}/job-county.sh > ${{PROJ_HOME}}/job_out_county/output_serial.out
 fi
 sleep 3
 """)
@@ -228,20 +228,20 @@ if [ `jq ."job_number_max" config.json` -gt 1 ]; then
 sacct -XP --state F,TO --noheader --starttime {time_ptr} --format JobName | grep "county" >> ${{PROJ_HOME}}/job_out_county/failed-temp.txt
 fi
 
+sleep 1
 sort ${{PROJ_HOME}}/job_out_county/failed-temp.txt | uniq > ${{PROJ_HOME}}/job_out_county/failed.txt
 rm ${{PROJ_HOME}}/job_out_county/failed-temp.txt
 
 ## Collect warnings
-grep -i "warning" ${{PROJ_HOME}}/job_out_county/output_*.out > > ${{PROJ_HOME}}/job_out_county/warning.txt
-
-sleep 3
+grep -i "warning" ${{PROJ_HOME}}/job_out_county/output_*.out > ${{PROJ_HOME}}/job_out_county/warning.txt
+sleep 1
 
 echo "-----------------------------------------------------------------------------------
 Job(s) start time: {time_ptr}
 Number of queries: {num_query}
 Number of jobs: `ls ${{PROJ_HOME}}/job_out_county/*.out | wc -l`
-Number of failed jobs: `cat ${{PROJ_HOME}}/job_out_county/failed.txt | wc -l`"
-Number of warnings (./job_out_county/warning.txt): `cat ${{PROJ_HOME}}/job_out_county/warning.txt | wc -l`"
+Number of failed jobs: `cat ${{PROJ_HOME}}/job_out_county/failed.txt | wc -l`
+Number of warnings ('./job_out_county/warning.txt'): `cat ${{PROJ_HOME}}/job_out_county/warning.txt | wc -l`"
 
 if [ `cat ${{PROJ_HOME}}/job_out_county/failed.txt | wc -l` -gt 0 ]; then
 echo "
@@ -267,6 +267,6 @@ sleep 3
 if [ {maxj} -gt 1 ]; then
 JOBID=$(tail -n 1 ${{PROJ_HOME}}/jobid-county.log)
 sbatch --parsable --dependency=afterok:$(echo ${{JOBID}}) ${{PROJ_HOME}}/report-county.sh
-else . ${{PROJ_HOME}}/report-county.sh
+else . ${{PROJ_HOME}}/report-county.sh > ${{PROJ_HOME}}/report-county-serial.out
 fi
 """)
