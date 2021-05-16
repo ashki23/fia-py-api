@@ -8,6 +8,9 @@ echo ============ Local environments ============ $(hostname) $(date)
 
 source environment.sh
 
+echo ============ Checking config file ==========
+
+if ! jq -e . config.json >/dev/null 2>&1; then echo "Config JSON file is nat valid:"; jq . config.json; return; fi
 if [ `jq ."job_number_max" config.json` -gt 1 ]; then
 if [ -z $(which sbatch) ]; then
 echo "'sbatch' command not found. In 'config.json' assign 1 for 'job_number_max' to proceed in serial."; return; fi

@@ -117,9 +117,8 @@ if __name__=='__main__':
     config = json.load(open(sys.argv[1]))
     year = config['year']
     state = config['state']
-
+    
     assert all([x in ['state','county','coordinate'] for x in config['query_type']]), "Select valid quary types i.e 'state', 'county', 'coordinate'"
-    assert "DC" not in state, "FIA does not include data for DC. Remove DC from the listed states in the config file."
     
     ## FIA attributes
     with open('./attributes_all.csv', 'r') as att:
