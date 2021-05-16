@@ -32,7 +32,7 @@ install -dvp ${{PROJ_HOME}}/job_out_county/archive/{time_pt}
 rm ${{FIA}}/job-county-*
 rm ${{PROJ_HOME}}/jobid-county.log
 rm ${{PROJ_HOME}}/serial-county-log.out
-mv ${{PROJ_HOME}}/job_out_county/*.* ${{PROJ_HOME}}/job_out_county/archive/{time_pt}/.
+mv ${{PROJ_HOME}}/job_out_county/*.* ${{PROJ_HOME}}/job_out_county/archive/{time_pt}
 """)
 
 ## Create batch files to download FIA JSON queries
@@ -46,7 +46,7 @@ for i in state_cd.keys():
 #SBATCH --mem=1G
 #SBATCH --partition={config['partition']}
 #SBATCH --time={config['job_time_hr']}:00:00
-#SBATCH --output ${{PROJ_HOME}}/job_out_county/county-{i}_%j.out
+#SBATCH --output ./job_out_county/county-{i}_%j.out
     """)
     for year in config['year']:
         invyr_id = os.popen(f"""
@@ -81,7 +81,7 @@ for i in state_cd.keys():
             
             file_path = f"${{FIA}}/json/county_{time_pt}/{att_cd}_{year}_{i}"
             batch.write(f"""
-echo "---------------- county-{i} | {year}-{att_cd}"
+echo "----------------------- county-{i} | {year}-{att_cd}"
 if [ ! -f {file_path}_{yr}.json ]; then
 wget -c --tries=2 --random-wait "https://apps.fs.usda.gov/Evalidator/rest/Evalidator/fullreport?reptype=State&lat=0&lon=0&radius=0&snum={att}&sdenom=No denominator - just produce estimates&wc={','.join(cd_yr)}&pselected=None&rselected=County code and name&cselected=None&ptime=Current&rtime=Current&ctime=Current&wf=&wnum=&wnumdenom=&FIAorRPA=FIADEF&outputFormat=JSON&estOnly=Y&schemaName=FS_FIADB." -O {file_path}_{yr}.json
 fi
@@ -121,6 +121,7 @@ for i in json_files:
         with open(i) as jf:
             js_data = json.load(jf)
     except json.decoder.JSONDecodeError:
+        print(f"Warning: {i} is not a vaild JSON input.")
         continue
 
     n = os.path.basename(i)
@@ -137,6 +138,7 @@ for i in json_files:
         try:
             value = round(j['column'][0]['cellValueNumerator'])
         except (TypeError, KeyError):
+            print(f"Warning: {i} does not have a vaild key or type data.")
             continue
         if content[0] == 'Total':
             att_state[state_abb].update({{'state': state_abb, f"{{att_cd}}_{{year}}": value}})
@@ -187,7 +189,7 @@ batch.write(f"""#!/bin/bash
 #SBATCH --job-name=Output-county
 #SBATCH --mem=8G
 #SBATCH --partition={config['partition']}
-#SBATCH --output ${{PROJ_HOME}}/job_out_county/county_%j.out
+#SBATCH --output ./job_out_county/output_%j.out
 
 python job-county.py config.json
 """)
@@ -212,10 +214,10 @@ report.write(f"""#!/bin/bash
 #SBATCH --job-name=Report-county
 #SBATCH --mem=4G
 #SBATCH --partition={config['partition']}
-#SBATCH --output ${{PROJ_HOME}}/report-county-%j.out
+#SBATCH --output ./report-county-%j.out
 
-## Collect jobs with ERROR
-for i in `ls ${{PROJ_HOME}}/job_out_county/*.out`; do
+## Collect jobs with error
+for i in `ls ${{PROJ_HOME}}/job_out_county/county-*.out`; do
     if grep -iq "ERROR" $i ; then
         echo $i | grep -Po "(?<=job_out_county/).*(?=_.*.out$)" >> ${{PROJ_HOME}}/job_out_county/failed-temp.txt
     fi
@@ -228,17 +230,23 @@ fi
 
 sort ${{PROJ_HOME}}/job_out_county/failed-temp.txt | uniq > ${{PROJ_HOME}}/job_out_county/failed.txt
 rm ${{PROJ_HOME}}/job_out_county/failed-temp.txt
-sleep 1
+
+## Collect warnings
+grep -i "warning" ${{PROJ_HOME}}/job_out_county/output_*.out > > ${{PROJ_HOME}}/job_out_county/warning.txt
+
+sleep 3
 
 echo "-----------------------------------------------------------------------------------
 Job(s) start time: {time_ptr}
 Number of queries: {num_query}
 Number of jobs: `ls ${{PROJ_HOME}}/job_out_county/*.out | wc -l`
 Number of failed jobs: `cat ${{PROJ_HOME}}/job_out_county/failed.txt | wc -l`"
+Number of warnings (./job_out_county/warning.txt): `cat ${{PROJ_HOME}}/job_out_county/warning.txt | wc -l`"
 
 if [ `cat ${{PROJ_HOME}}/job_out_county/failed.txt | wc -l` -gt 0 ]; then
 echo "
 Find failed jobs' name in '${{PROJ_HOME}}/job_out_county/failed.txt'
+
 Failure can be relared to:
 
       - EVALIDator and the FIADB may be unavailable during this time
@@ -246,7 +254,7 @@ Failure can be relared to:
       - Input coordinates may be unvalid (for the 'coodinate' query type)
       - Slurm job failure
 
-If the failure is related to Slurm jobs, consider to run 'rebatch_file.sh' file to resubmit the failed jobs."
+If the failure is related to EVALIDator servers or Slurm jobs, consider to run 'rebatch_file.sh' file to resubmit the failed jobs. Otherwise, modify config file and/or input files and resubmit the 'batch_file.sh'."
 fi
 
 echo -----------------------------------------------------------------------------------

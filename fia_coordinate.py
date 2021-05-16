@@ -24,7 +24,7 @@ install -dvp ${{PROJ_HOME}}/job_out_{file_name}/archive/{time_pt}
 rm ${{FIA}}/job-{file_name}-*
 rm ${{PROJ_HOME}}/jobid-{file_name}.log
 rm ${{PROJ_HOME}}/serial-{file_name}-log.out
-mv ${{PROJ_HOME}}/job_out_{file_name}/*.* ${{PROJ_HOME}}/job_out_{file_name}/archive/{time_pt}/.
+mv ${{PROJ_HOME}}/job_out_{file_name}/*.* ${{PROJ_HOME}}/job_out_{file_name}/archive/{time_pt}
 """)
 
 ## Calculating optimal batch size
@@ -50,7 +50,7 @@ for att_cd in config['attribute_cd']:
 #SBATCH --mem=1G
 #SBATCH --partition={config['partition']}
 #SBATCH --time={config['job_time_hr']}:00:00
-#SBATCH --output ${{PROJ_HOME}}/job_out_{file_name}/{file_name}-{att_cd}-{year}-{i}_%j.out
+#SBATCH --output ./job_out_{file_name}/{file_name}-{att_cd}-{year}-{i}_%j.out
             """)
             lnum = 0
             for l in select_row:
@@ -95,7 +95,7 @@ for att_cd in config['attribute_cd']:
                 lnum += 1
                 file_path = f"${{FIA}}/json/{file_name}_{time_pt}/{att_cd}_{year}_id{l['unit_id']}"
                 batch.write(f"""
-echo "---------------- {file_name}-{att_cd}-{year}-{i} | {lnum} out of {len(select_row)}"
+echo "----------------------- {file_name}-{att_cd}-{year}-{i} | {lnum} out of {len(select_row)}"
 if [ ! -f {file_path}_{yr}.json ]; then
 wget -c --tries=2 --random-wait "https://apps.fs.usda.gov/Evalidator/rest/Evalidator/fullreport?reptype=Circle&lat={l['lat']}&lon={l['lon']}&radius={l['radius']}&snum={att}&sdenom=No denominator - just produce estimates&wc={','.join(cd_yr)}&pselected=None&rselected=All live stocking&cselected=None&ptime=Current&rtime=Current&ctime=Current&wf=&wnum=&wnumdenom=&FIAorRPA=FIADEF&outputFormat=JSON&estOnly=Y&schemaName=FS_FIADB." -O {file_path}_{yr}.json
 fi
@@ -134,6 +134,7 @@ for i in json_files:
         with open(i) as jf:
             js_data = json.load(jf)
     except json.decoder.JSONDecodeError:
+        print(f"Warning: {i} is not a vaild JSON input.")
         continue
 
     n = os.path.basename(i)
@@ -150,8 +151,9 @@ for i in json_files:
     try:
         value = round(js_data['EVALIDatorOutput']['row'][0]['column'][0]['cellValueNumerator'])
     except (TypeError, KeyError):
+        print(f"Warning: {i} does not have a vaild key or type data.")
         continue
-    att_coordinate[unit_id].update({{'unit_id': uniq_id, 'state': state, 'state_cd': state_cd, 'lat': lat, 'lon': lon, 'radius': radius, f"{{att_cd}}_{{year}}": value}})
+    att_coordinate[unit_id].update({{'unit_id': unit_id, 'state': state, 'state_cd': state_cd, 'lat': lat, 'lon': lon, 'radius': radius, f"{{att_cd}}_{{year}}": value}})
 
 ## JSON output
 with open('./outputs/{file_name}-{time_pt}.json', 'w') as fj:
@@ -180,7 +182,7 @@ batch.write(f"""#!/bin/bash
 #SBATCH --job-name=Output-{file_name}
 #SBATCH --mem=8G
 #SBATCH --partition={config['partition']}
-#SBATCH --output ${{PROJ_HOME}}/job_out_{file_name}/{file_name}_%j.out
+#SBATCH --output ./job_out_{file_name}/output_%j.out
 
 python job-{file_name}.py config.json
 """)
@@ -205,10 +207,10 @@ report.write(f"""#!/bin/bash
 #SBATCH --job-name=Report-{file_name}
 #SBATCH --mem=4G
 #SBATCH --partition={config['partition']}
-#SBATCH --output ${{PROJ_HOME}}/report-{file_name}-%j.out
+#SBATCH --output ./report-{file_name}-%j.out
 
-## Collect jobs with ERROR
-for i in `ls ${{PROJ_HOME}}/job_out_{file_name}/*.out`; do
+## Collect jobs with error
+for i in `ls ${{PROJ_HOME}}/job_out_{file_name}/{file_name}-*.out`; do
     if grep -iq "ERROR" $i ; then
         echo $i | grep -Po "(?<=job_out_{file_name}/).*(?=_.*.out$)" >> ${{PROJ_HOME}}/job_out_{file_name}/failed-temp.txt
     fi
@@ -221,17 +223,23 @@ fi
 
 sort ${{PROJ_HOME}}/job_out_{file_name}/failed-temp.txt | uniq > ${{PROJ_HOME}}/job_out_{file_name}/failed.txt
 rm ${{PROJ_HOME}}/job_out_{file_name}/failed-temp.txt
-sleep 1
+
+## Collect warnings
+grep -i "warning" ${{PROJ_HOME}}/job_out_{file_name}/output_*.out > > ${{PROJ_HOME}}/job_out_{file_name}/warning.txt
+
+sleep 3
 
 echo "-----------------------------------------------------------------------------------
 Job(s) start time: {time_ptr}
 Number of queries: {num_query}
-Number of jobs: `ls ${{PROJ_HOME}}/job_out_county/*.out | wc -l`
-Number of failed jobs: `cat ${{PROJ_HOME}}/job_out_county/failed.txt | wc -l`"
+Number of jobs: `ls ${{PROJ_HOME}}/job_out_{file_name}/*.out | wc -l`
+Number of failed jobs: `cat ${{PROJ_HOME}}/job_out_{file_name}/failed.txt | wc -l`"
+Number of warnings (./job_out_{file_name}/warning.txt): `cat ${{PROJ_HOME}}/job_out_{file_name}/warning.txt | wc -l`"
 
-if [ `cat ${{PROJ_HOME}}/job_out_county/failed.txt | wc -l` -gt 0 ]; then
+if [ `cat ${{PROJ_HOME}}/job_out_{file_name}/failed.txt | wc -l` -gt 0 ]; then
 echo "
-Find failed jobs' name in '${{PROJ_HOME}}/job_out_county/failed.txt'
+Find failed jobs' name in '${{PROJ_HOME}}/job_out_{file_name}/failed.txt'
+
 Failure can be relared to:
 
       - EVALIDator and the FIADB may be unavailable during this time
@@ -239,7 +247,7 @@ Failure can be relared to:
       - Input coordinates may be unvalid (for the 'coodinate' query type)
       - Slurm job failure
 
-If the failure is related to Slurm jobs, consider to run 'rebatch_file.sh' file to resubmit the failed jobs."
+If the failure is related to EVALIDator servers or Slurm jobs, consider to run 'rebatch_file.sh' file to resubmit the failed jobs. Otherwise, modify config file and/or input files and resubmit the 'batch_file.sh'."
 fi
 
 echo -----------------------------------------------------------------------------------
