@@ -121,7 +121,7 @@ for i in json_files:
         with open(i) as jf:
             js_data = json.load(jf)
     except json.decoder.JSONDecodeError:
-        print(f"Warning: {i} is not a vaild JSON input.")
+        print(f"Warning: {{i}} is not a vaild JSON input.")
         continue
 
     n = os.path.basename(i)
@@ -138,7 +138,7 @@ for i in json_files:
         try:
             value = round(j['column'][0]['cellValueNumerator'])
         except (TypeError, KeyError):
-            print(f"Warning: {i} does not have a vaild key or type data.")
+            print(f"Warning: {{i}} does not have a vaild key or type data.")
             continue
         if content[0] == 'Total':
             att_state[state_abb].update({{'state': state_abb, f"{{att_cd}}_{{year}}": value}})
@@ -240,24 +240,31 @@ echo "--------------------------------------------------------------------------
 Job(s) start time: {time_ptr}
 Number of queries: {num_query}
 Number of jobs: `ls ${{PROJ_HOME}}/job_out_county/*.out | wc -l`
+Number of warnings: `cat ${{PROJ_HOME}}/job_out_county/warning.txt | wc -l`
 Number of failed jobs: `cat ${{PROJ_HOME}}/job_out_county/failed.txt | wc -l`
-Number of warnings ('./job_out_county/warning.txt'): `cat ${{PROJ_HOME}}/job_out_county/warning.txt | wc -l`"
 
-if [ `cat ${{PROJ_HOME}}/job_out_county/failed.txt | wc -l` -gt 0 ]; then
-echo "
-Find failed jobs' name in '${{PROJ_HOME}}/job_out_county/failed.txt'
+Find name of jobs with a warning or failure in:
+     - ./job_out_county/warning.txt
+     - ./job_out_county/failed.txt
 
-Failure can be relared to:
+Find the CSV and JSON outputs in (when jobs done with no failure):
+      - ./outputs/county-{time_pt}.csv
+      - ./outputs/county-panel-{time_pt}.csv
+      - ./outputs/county-{time_pt}.json
+      - ./outputs/state-{time_pt}.csv
+      - ./outputs/state-panel-{time_pt}.csv
+      - ./outputs/state-{time_pt}.json
+
+Failures can be related to:
 
       - EVALIDator and the FIADB may be unavailable during this time
       - Config file inputs may be unvaild
       - Input coordinates may be unvalid (for the 'coodinate' query type)
       - Slurm job failure
 
-Make sure EVALIDator servers is available and config file and/or input files are valid and consider to resubmit the 'batch_file.sh'."
-fi
+If the failure is related to EVALIDator servers or Slurm jobs, consider to run 'rebatch_file.sh' file to resubmit the failed jobs. Otherwise, modify config file and/or input files and resubmit the 'batch_file.sh'."
 
-echo -----------------------------------------------------------------------------------
+-----------------------------------------------------------------------------------
 """)
 report.close()
 
@@ -265,8 +272,8 @@ report.close()
 os.system(f"""
 sleep 3
 if [ {maxj} -gt 1 ]; then
-JOBID=$(tail -n 1 ${{PROJ_HOME}}/jobid-county.log)
-sbatch --parsable --dependency=afterok:$(echo ${{JOBID}}) ${{PROJ_HOME}}/report-county.sh
+JOBID=$(tail -qn 1 ${{PROJ_HOME}}/jobid-county.log)
+sbatch --parsable --dependency=afterany:$(echo ${{JOBID}}) ${{PROJ_HOME}}/report-county.sh
 else . ${{PROJ_HOME}}/report-county.sh > ${{PROJ_HOME}}/report-state-county-serial.out
 fi
 """)

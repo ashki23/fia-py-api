@@ -134,7 +134,7 @@ for i in json_files:
         with open(i) as jf:
             js_data = json.load(jf)
     except json.decoder.JSONDecodeError:
-        print(f"Warning: {i} is not a vaild JSON input.")
+        print(f"Warning: {{i}} is not a vaild JSON input.")
         continue
 
     n = os.path.basename(i)
@@ -151,7 +151,7 @@ for i in json_files:
     try:
         value = round(js_data['EVALIDatorOutput']['row'][0]['column'][0]['cellValueNumerator'])
     except (TypeError, KeyError):
-        print(f"Warning: {i} does not have a vaild key or type data.")
+        print(f"Warning: {{i}} does not have a vaild key or type data.")
         continue
     att_coordinate[unit_id].update({{'unit_id': unit_id, 'state': state, 'state_cd': state_cd, 'lat': lat, 'lon': lon, 'radius': radius, f"{{att_cd}}_{{year}}": value}})
 
@@ -233,14 +233,19 @@ echo "--------------------------------------------------------------------------
 Job(s) start time: {time_ptr}
 Number of queries: {num_query}
 Number of jobs: `ls ${{PROJ_HOME}}/job_out_{file_name}/*.out | wc -l`
+Number of warnings: `cat ${{PROJ_HOME}}/job_out_{file_name}/warning.txt | wc -l`
 Number of failed jobs: `cat ${{PROJ_HOME}}/job_out_{file_name}/failed.txt | wc -l`
-Number of warnings ('./job_out_{file_name}/warning.txt'): `cat ${{PROJ_HOME}}/job_out_{file_name}/warning.txt | wc -l`"
 
-if [ `cat ${{PROJ_HOME}}/job_out_{file_name}/failed.txt | wc -l` -gt 0 ]; then
-echo "
-Find failed jobs' name in '${{PROJ_HOME}}/job_out_{file_name}/failed.txt'
+Find name of jobs with a warning or failure in:
+     - ./job_out_{file_name}/warning.txt
+     - ./job_out_{file_name}/failed.txt
 
-Failure can be relared to:
+Find the CSV and JSON outputs in (when jobs done with no failure):
+      - ./outputs/{file_name}-{time_pt}.csv
+      - ./outputs/{file_name}-panel-{time_pt}.csv
+      - ./outputs/{file_name}-{time_pt}.json
+
+Failures can be related to:
 
       - EVALIDator and the FIADB may be unavailable during this time
       - Config file inputs may be unvaild
@@ -248,9 +253,8 @@ Failure can be relared to:
       - Slurm job failure
 
 If the failure is related to EVALIDator servers or Slurm jobs, consider to run 'rebatch_file.sh' file to resubmit the failed jobs. Otherwise, modify config file and/or input files and resubmit the 'batch_file.sh'."
-fi
 
-echo -----------------------------------------------------------------------------------
+-----------------------------------------------------------------------------------
 """)
 report.close()
 
@@ -258,8 +262,8 @@ report.close()
 os.system(f"""
 sleep 3
 if [ {maxj} -gt 1 ]; then
-JOBID=$(tail -n 1 ${{PROJ_HOME}}/jobid-{file_name}.log)
-sbatch --parsable --dependency=afterok:$(echo ${{JOBID}}) ${{PROJ_HOME}}/report-{file_name}.sh
+JOBID=$(tail -qn 1 ${{PROJ_HOME}}/jobid-{file_name}.log)
+sbatch --parsable --dependency=afterany:$(echo ${{JOBID}}) ${{PROJ_HOME}}/report-{file_name}.sh
 else . ${{PROJ_HOME}}/report-{file_name}.sh > ${{PROJ_HOME}}/report-{file_name}-serial.out
 fi
 """)
