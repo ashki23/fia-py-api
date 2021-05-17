@@ -1,6 +1,7 @@
 #!/bin/bash
 
-read -p "Select the query type (i.e. coordinate): " query_name
+read -p "Select the query type (i.e. state, county or coordinate): " query_name
+if [ $query_name = "state" ]; then query_name="county"; fi
 
 ## Set env variables
 source environment.sh
