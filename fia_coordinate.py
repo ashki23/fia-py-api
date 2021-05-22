@@ -252,9 +252,8 @@ Failures can be related to:
       - Input coordinates may be unvalid (for the 'coodinate' query type)
       - Slurm job failure
 
-If the failure is related to EVALIDator servers or Slurm jobs, consider to run 'rebatch_file.sh' file to resubmit the failed jobs. Otherwise, modify config file and/or input files and resubmit the 'batch_file.sh'."
-
------------------------------------------------------------------------------------
+If the failure is related to EVALIDator servers or Slurm jobs, consider to run 'rebatch_file.sh' file to resubmit the failed jobs. Otherwise, modify config file and/or input files and resubmit the 'batch_file.sh'.
+-----------------------------------------------------------------------------------"
 """)
 report.close()
 
