@@ -61,7 +61,7 @@ else:
     ## Input
     state_in = input('Insert state: ').upper().strip()
     county_in = input('Insert county: ').capitalize().strip()
-    unit_id = f"{county_in}_{state_in}"
+    unit_id = f"{state_in}_{county_in}"
         
     ## Query
     if unit_id in database.keys():

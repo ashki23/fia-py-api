@@ -144,10 +144,14 @@ for i in json_files:
             print(f"Warning: {{i}} does not have a vaild key or type data.")
             continue
         if content[0] == 'Total':
-            att_state[state_abb].update({{'state': state_abb, f"{{att_cd}}_{{year}}": value}})
+            att_state[state_abb].update({{'state': state_abb, 'state_name': state_nm, f"{{att_cd}}_{{year}}": value}})
         else:
             county = content[2].capitalize()
-            att_county[f"{{county}}_{{state_abb}}"].update({{'county_cd': content[0], 'county': county, 'state': state_abb, 'state_name': state_nm, f"{{att_cd}}_{{year}}": value}})
+            att_county[f"{{state_abb}}_{{county}}"].update({{'county_cd': content[0], 'county': county, 'state': state_abb, 'state_name': state_nm, f"{{att_cd}}_{{year}}": value}})
+
+## Sorting by keys
+att_county = {k: att_county[k] for k in sorted(att_county.keys())}
+att_state = {k: att_state[k] for k in sorted(att_state.keys())}
 
 ## JSON output
 with open('./outputs/county-{time_pt}.json', 'w') as fj:

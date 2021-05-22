@@ -162,6 +162,9 @@ for i in json_files:
         continue
     att_coordinate[unit_id].update({{'unit_id': unit_id, 'state_name': state_nm, 'state': state, 'state_cd': state_cd, 'lat': lat, 'lon': lon, 'radius': radius, f"{{att_cd}}_{{year}}": value}})
 
+## Sorting by keys
+att_coordinate = {k: att_coordinate[k] for k in sorted(att_coordinate.keys())}
+
 ## JSON output
 with open('./outputs/{file_name}-{time_pt}.json', 'w') as fj:
     json.dump(att_coordinate, fj)
