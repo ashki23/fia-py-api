@@ -127,6 +127,7 @@ import collections
 
 config = json.load(open(sys.argv[1]))
 json_files = glob.glob('./fia_data/json/{file_name}_{time_pt}/*.json')
+state_abb = prep_data.csv_dict(open('./state_abb.csv'))
 att_coordinate = collections.defaultdict(dict)
 
 for i in json_files:
@@ -145,15 +146,21 @@ for i in json_files:
     radius = js_data['EVALIDatorOutput']['circleRadiusMiles']
     att_cd = js_data['EVALIDatorOutput']['numeratorAttributeNumber']
     state_inv = list(js_data['EVALIDatorOutput']['selectedInventories']['stateInventory'])[0].split()
-    state = state_inv[0].capitalize()
-    state_cd = state_inv[1][:-4]
-    year_survey = state_inv[1][2:]
+    if len(state_inv) == 2:
+        state_nm = state_inv[0].capitalize()
+        state_cd = state_inv[1][:-4]
+        year_survey = state_inv[1][2:]
+    else:
+        state_nm = state_inv[0].capitalize() + ' ' + state_inv[1].capitalize()
+        state_cd = state_inv[2][:-4]
+        year_survey = state_inv[2][2:]
+    state = state_abb[state_nm]
     try:
         value = round(js_data['EVALIDatorOutput']['row'][0]['column'][0]['cellValueNumerator'])
     except (TypeError, KeyError):
         print(f"Warning: {{i}} does not have a vaild key or type data.")
         continue
-    att_coordinate[unit_id].update({{'unit_id': unit_id, 'state': state, 'state_cd': state_cd, 'lat': lat, 'lon': lon, 'radius': radius, f"{{att_cd}}_{{year}}": value}})
+    att_coordinate[unit_id].update({{'unit_id': unit_id, 'state_name': state_nm, 'state': state, 'state_cd': state_cd, 'lat': lat, 'lon': lon, 'radius': radius, f"{{att_cd}}_{{year}}": value}})
 
 ## JSON output
 with open('./outputs/{file_name}-{time_pt}.json', 'w') as fj:

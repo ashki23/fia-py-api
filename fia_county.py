@@ -112,7 +112,6 @@ import collections
 
 config = json.load(open(sys.argv[1]))
 json_files = glob.glob('./fia_data/json/county_{time_pt}/*.json')
-
 att_county = collections.defaultdict(dict)
 att_state = collections.defaultdict(dict)
 
@@ -129,10 +128,14 @@ for i in json_files:
     state_abb = js_data['EVALIDatorOutput']['row'][1]['content'].split()[1].upper()
     att_cd = js_data['EVALIDatorOutput']['numeratorAttributeNumber']
     state_inv = js_data['EVALIDatorOutput']['selectedInventories']['stateInventory'].split()
-    state = state_inv[0].capitalize()
-    state_cd = state_inv[1][:-4]
-    year_survey = state_inv[1][2:]
-    
+    if len(state_inv) == 2:
+        state_nm = state_inv[0].capitalize()
+        state_cd = state_inv[1][:-4]
+        year_survey = state_inv[1][2:]
+    else:
+        state_nm = state_inv[0].capitalize() + ' ' + state_inv[1].capitalize()
+        state_cd = state_inv[2][:-4]
+        year_survey = state_inv[2][2:]
     for j in js_data['EVALIDatorOutput']['row']:
         content = j['content'].split()
         try:
@@ -144,7 +147,7 @@ for i in json_files:
             att_state[state_abb].update({{'state': state_abb, f"{{att_cd}}_{{year}}": value}})
         else:
             county = content[2].capitalize()
-            att_county[f"{{county}}_{{state_abb}}"].update({{'county_cd': content[0], 'county': county, 'state': state_abb, f"{{att_cd}}_{{year}}": value}})
+            att_county[f"{{county}}_{{state_abb}}"].update({{'county_cd': content[0], 'county': county, 'state': state_abb, 'state_name': state_nm, f"{{att_cd}}_{{year}}": value}})
 
 ## JSON output
 with open('./outputs/county-{time_pt}.json', 'w') as fj:
