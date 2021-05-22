@@ -128,14 +128,10 @@ for i in json_files:
     state_abb = js_data['EVALIDatorOutput']['row'][1]['content'].split()[1].upper()
     att_cd = js_data['EVALIDatorOutput']['numeratorAttributeNumber']
     state_inv = js_data['EVALIDatorOutput']['selectedInventories']['stateInventory'].split()
-    if len(state_inv) == 2:
-        state_nm = state_inv[0].capitalize()
-        state_cd = state_inv[1][:-4]
-        year_survey = state_inv[1][2:]
-    else:
-        state_nm = state_inv[0].capitalize() + ' ' + state_inv[1].capitalize()
-        state_cd = state_inv[2][:-4]
-        year_survey = state_inv[2][2:]
+    state_nm = " ".join([x.capitalize() for x in state_inv[:-1]]).replace('Us', 'U.S.')
+    state_cd = state_inv[-1][:-4]
+    year_survey = state_inv[-1][2:]
+
     for j in js_data['EVALIDatorOutput']['row']:
         content = j['content'].split()
         try:

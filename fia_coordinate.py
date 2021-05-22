@@ -146,15 +146,10 @@ for i in json_files:
     radius = js_data['EVALIDatorOutput']['circleRadiusMiles']
     att_cd = js_data['EVALIDatorOutput']['numeratorAttributeNumber']
     state_inv = list(js_data['EVALIDatorOutput']['selectedInventories']['stateInventory'])[0].split()
-    if len(state_inv) == 2:
-        state_nm = state_inv[0].capitalize()
-        state_cd = state_inv[1][:-4]
-        year_survey = state_inv[1][2:]
-    else:
-        state_nm = state_inv[0].capitalize() + ' ' + state_inv[1].capitalize()
-        state_cd = state_inv[2][:-4]
-        year_survey = state_inv[2][2:]
+    state_nm = " ".join([x.capitalize() for x in state_inv[:-1]]).replace('Us', 'U.S.')
     state = state_abb[state_nm]
+    state_cd = state_inv[-1][:-4]
+    year_survey = state_inv[-1][2:]
     try:
         value = round(js_data['EVALIDatorOutput']['row'][0]['column'][0]['cellValueNumerator'])
     except (TypeError, KeyError):
