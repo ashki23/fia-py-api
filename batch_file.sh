@@ -27,7 +27,7 @@ echo =============== Preparations =============== $(hostname) $(date)
 source download.sh
 python prep_data.py config.json || return || exit
 
-echo =============== HTML queries =============== $(hostname) $(date)
+echo =============== JSON queries =============== $(hostname) $(date)
 
 ## Download level of forest attributes from online source (EVALIDator)
 if jq ."query_type" config.json | grep -q "coordinate"; then

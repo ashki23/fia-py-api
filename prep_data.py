@@ -178,6 +178,13 @@ if __name__=='__main__':
             p['neighbors'] =  neighbor_state[p['state']]
             p['neighbors_cd'] =  neighbor_cd[p['state']]
         
-        ### JSON output of coordinates
+        ### JSON output of unique coordinates
+        xydata_uniq = select_uniq_id(xydata,'unit_id')
         with open('./coordinate.json', 'w') as fj:
-            json.dump(xydata,fj)
+            json.dump(xydata_uniq,fj)
+        
+        ### Write a CSV incluing unit_ids
+        keys = list(header)
+        with open ('./coordinate_id.csv', 'w') as fc:
+            list_dict_csv(xydata,keys,fc)
+        
