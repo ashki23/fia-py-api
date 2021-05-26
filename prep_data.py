@@ -118,6 +118,7 @@ if __name__=='__main__':
     year = config['year']
     state = config['state']
     
+    assert "DC" not in state, "FIA does not include data for DC. Remove DC from the listed states in the config file."
     assert all([x in ['state','county','coordinate'] for x in config['query_type']]), "Select valid quary types i.e 'state', 'county', 'coordinate'"
     
     ## FIA attributes
