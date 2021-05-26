@@ -158,7 +158,7 @@ for i in json_files:
     att_coordinate[unit_id].update({{'unit_id': unit_id, 'state_name': state_nm, 'state': state, 'state_cd': state_cd, 'lat': lat, 'lon': lon, 'radius': radius, f"{{att_cd}}_{{year}}": value}})
 
 ## Sorting by keys
-att_coordinate = {k: att_coordinate[k] for k in sorted(att_coordinate.keys())}
+att_coordinate = {{k: att_coordinate[k] for k in sorted(att_coordinate.keys())}}
 
 ## JSON output
 with open('./outputs/{file_name}-{time_pt}.json', 'w') as fj:
@@ -195,14 +195,14 @@ batch.close()
 
 ## Submit the batch file
 os.system(f"""
-sleep 3
+sleep 2
 if [ {maxj} -gt 1 ]; then
 JOBID=$(cat ${{PROJ_HOME}}/jobid-{file_name}.log | tr '\n' ',' | grep -Po '.*(?=,$)')
 JID=$(sbatch --parsable --dependency=afterok:$(echo ${{JOBID}}) ${{PROJ_HOME}}/job-{file_name}.sh)
 echo ${{JID}} >> ${{PROJ_HOME}}/jobid-{file_name}.log
 else . ${{PROJ_HOME}}/job-{file_name}.sh > ${{PROJ_HOME}}/job_out_{file_name}/output_serial.out
 fi
-sleep 3
+sleep 2
 """)
 
 ## Create a batch file to collect reports
@@ -264,7 +264,7 @@ report.close()
 
 ## Submit the batch file
 os.system(f"""
-sleep 3
+sleep 2
 if [ {maxj} -gt 1 ]; then
 JOBID=$(tail -qn 1 ${{PROJ_HOME}}/jobid-{file_name}.log)
 sbatch --parsable --dependency=afterany:$(echo ${{JOBID}}) ${{PROJ_HOME}}/report-{file_name}.sh

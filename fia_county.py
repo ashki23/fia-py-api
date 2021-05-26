@@ -146,8 +146,8 @@ for i in json_files:
             att_county[f"{{state_abb}}_{{county}}"].update({{'county_cd': content[0], 'county': county, 'state': state_abb, 'state_name': state_nm, f"{{att_cd}}_{{year}}": value}})
 
 ## Sorting by keys
-att_county = {k: att_county[k] for k in sorted(att_county.keys())}
-att_state = {k: att_state[k] for k in sorted(att_state.keys())}
+att_county = {{k: att_county[k] for k in sorted(att_county.keys())}}
+att_state = {{k: att_state[k] for k in sorted(att_state.keys())}}
 
 ## JSON output
 with open('./outputs/county-{time_pt}.json', 'w') as fj:
@@ -200,14 +200,14 @@ batch.close()
 
 ## Submit the batch file
 os.system(f"""
-sleep 3
+sleep 2
 if [ {maxj} -gt 1 ]; then
 JOBID=$(cat ${{PROJ_HOME}}/jobid-county.log | tr '\n' ',' | grep -Po '.*(?=,$)')
 JID=$(sbatch --parsable --dependency=afterok:$(echo ${{JOBID}}) ${{PROJ_HOME}}/job-county.sh)
 echo ${{JID}} >> ${{PROJ_HOME}}/jobid-county.log
 else . ${{PROJ_HOME}}/job-county.sh > ${{PROJ_HOME}}/job_out_county/output_serial.out
 fi
-sleep 3
+sleep 2
 """)
 
 ## Create a batch file to collect reports
@@ -272,7 +272,7 @@ report.close()
 
 ## Submit the batch file
 os.system(f"""
-sleep 3
+sleep 2
 if [ {maxj} -gt 1 ]; then
 JOBID=$(tail -qn 1 ${{PROJ_HOME}}/jobid-county.log)
 sbatch --parsable --dependency=afterany:$(echo ${{JOBID}}) ${{PROJ_HOME}}/report-county.sh
