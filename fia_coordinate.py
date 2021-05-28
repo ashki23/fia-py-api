@@ -31,7 +31,7 @@ mv ${{PROJ_HOME}}/job_out_{file_name}/*.* ${{PROJ_HOME}}/job_out_{file_name}/arc
 num_query = len(config['attribute_cd']) * len(config['year']) * len(input_data)
 batch_size = max(round(num_query / maxj), 1)
 if batch_size < len(input_data):
-    batch_size += len(input_data) % batch_size + 1
+    batch_size += round((len(input_data) % batch_size) / (len(input_data) // batch_size)) + 1
 
 ## Create batch files to download FIA JSON queries
 for att_cd in config['attribute_cd']:
@@ -39,8 +39,8 @@ for att_cd in config['attribute_cd']:
     for year in config['year']:
         i = 0
         nrow = len(input_data)
-        select_row = input_data[i:i + batch_size]
         while i < nrow:
+            select_row = input_data[i:i + batch_size]
             print('*************', year, att, 'row: ', i, '-', len(select_row), '***************')
             batch = open(f"./fia_data/job-{file_name}-{att_cd}-{year}-{i}.sh",'w')
             batch.write(f"""#!/bin/bash
@@ -79,7 +79,7 @@ for att_cd in config['attribute_cd']:
                         yr = year
                         cd_yr = [f"{x}{yr}" for x in states_cd]
                     else:
-                        print(f"\n-------- Warning: Estimate not available for state {i} for year {year} --------\n")
+                        print(f"\n-------- Warning: Estimate not available for state {l['state']} for year {year} --------\n")
                         continue
                 else:
                     cd_yr = []
