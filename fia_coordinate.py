@@ -12,7 +12,7 @@ time_ptr = time.strftime("%Y-%m-%d-%H:%M", time.strptime(time_pt,"%Y%m%d-%H%M%S"
 ## Open JSON inputs
 config = json.load(open(sys.argv[1]))
 tol = config['tolerance']
-maxj = config['job_number_max']
+max_job = config['job_number_max']
 attribute = json.load(open(sys.argv[2]))
 input_data = json.load(open(sys.argv[3]))
 file_name = sys.argv[3].split('.')[0]
@@ -29,7 +29,7 @@ mv ${{PROJ_HOME}}/job_out_{file_name}/*.* ${{PROJ_HOME}}/job_out_{file_name}/arc
 
 ## Calculating optimal batch size
 num_query = len(config['attribute_cd']) * len(config['year']) * len(input_data)
-batch_size = max(round(num_query / maxj), 1)
+batch_size = max(round(num_query / max_job), 1)
 if batch_size < len(input_data):
     batch_size += round((len(input_data) % batch_size) / (len(input_data) // batch_size)) + 1
 
@@ -50,7 +50,7 @@ for att_cd in config['attribute_cd']:
 #SBATCH --mem=1G
 #SBATCH --partition={config['partition']}
 #SBATCH --time={config['job_time_hr']}:00:00
-#SBATCH --output ./job_out_{file_name}/{file_name}-{att_cd}-{year}-{i}_%j.out
+#SBATCH --output=./job_out_{file_name}/{file_name}-{att_cd}-{year}-{i}_%j.out
             """)
             lnum = 0
             for l in select_row:
@@ -104,7 +104,7 @@ fi
             
             ## Submit the batch file
             os.system(f"""
-            if [ {maxj} -gt 1 ]; then
+            if [ {max_job} -gt 1 ]; then
             JID=$(sbatch --parsable ${{FIA}}/job-{file_name}-{att_cd}-{year}-{i}.sh)
             echo ${{JID}} >> ${{PROJ_HOME}}/jobid-{file_name}.log
             else . ${{FIA}}/job-{file_name}-{att_cd}-{year}-{i}.sh > ${{PROJ_HOME}}/job_out_{file_name}/{file_name}-{att_cd}-{year}-{i}.out
@@ -187,7 +187,7 @@ batch.write(f"""#!/bin/bash
 #SBATCH --job-name=Output-{file_name}
 #SBATCH --mem=8G
 #SBATCH --partition={config['partition']}
-#SBATCH --output ./job_out_{file_name}/output_%j.out
+#SBATCH --output=./job_out_{file_name}/output_%j.out
 
 python job-{file_name}.py config.json
 """)
@@ -196,7 +196,7 @@ batch.close()
 ## Submit the batch file
 os.system(f"""
 sleep 2
-if [ {maxj} -gt 1 ]; then
+if [ {max_job} -gt 1 ]; then
 JOBID=$(cat ${{PROJ_HOME}}/jobid-{file_name}.log | tr '\n' ',' | grep -Po '.*(?=,$)')
 JID=$(sbatch --parsable --dependency=afterok:$(echo ${{JOBID}}) ${{PROJ_HOME}}/job-{file_name}.sh)
 echo ${{JID}} >> ${{PROJ_HOME}}/jobid-{file_name}.log
@@ -212,11 +212,11 @@ report.write(f"""#!/bin/bash
 #SBATCH --job-name=Report-{file_name}
 #SBATCH --mem=4G
 #SBATCH --partition={config['partition']}
-#SBATCH --output ./report-{file_name}-%j.out
+#SBATCH --output=./report-{file_name}-%j.out
 
 ## Collect jobs with error
 for i in `ls ${{PROJ_HOME}}/job_out_{file_name}/{file_name}-*.out`; do
-    if grep -iq "ERROR" $i ; then
+    if grep -Piq "ERROR|failed" $i; then
         echo $i | grep -Po "(?<=job_out_{file_name}/).*(?=_.*.out$)" >> ${{PROJ_HOME}}/job_out_{file_name}/failed-temp.txt
     fi
 done
@@ -265,7 +265,7 @@ report.close()
 ## Submit the batch file
 os.system(f"""
 sleep 2
-if [ {maxj} -gt 1 ]; then
+if [ {max_job} -gt 1 ]; then
 JOBID=$(tail -qn 1 ${{PROJ_HOME}}/jobid-{file_name}.log)
 sbatch --parsable --dependency=afterany:$(echo ${{JOBID}}) ${{PROJ_HOME}}/report-{file_name}.sh
 else . ${{PROJ_HOME}}/report-{file_name}.sh > ${{PROJ_HOME}}/report-{file_name}-serial.out

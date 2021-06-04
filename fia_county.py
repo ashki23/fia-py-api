@@ -14,7 +14,7 @@ time_ptr = time.strftime("%Y-%m-%d-%H:%M", time.strptime(time_pt,"%Y%m%d-%H%M%S"
 ## Open JSON inputs
 config = json.load(open(sys.argv[1]))
 tol = config['tolerance']
-maxj = int(config['job_number_max'])
+max_job = int(config['job_number_max'])
 attribute = json.load(open(sys.argv[2]))
 num_query = len(config['attribute_cd']) * len(config['year']) * len(config['state'])
 
@@ -46,7 +46,7 @@ for i in state_cd.keys():
 #SBATCH --mem=1G
 #SBATCH --partition={config['partition']}
 #SBATCH --time={config['job_time_hr']}:00:00
-#SBATCH --output ./job_out_county/county-{i}_%j.out
+#SBATCH --output=./job_out_county/county-{i}_%j.out
     """)
     for year in config['year']:
         invyr_id = os.popen(f"""
@@ -90,7 +90,7 @@ fi
     
     ## Submit the batch file
     os.system(f"""
-    if [ {maxj} -gt 1 ]; then
+    if [ {max_job} -gt 1 ]; then
     JID=$(sbatch --parsable ${{FIA}}/job-county-{i}.sh)
     echo ${{JID}} >> ${{PROJ_HOME}}/jobid-county.log
     else . ${{FIA}}/job-county-{i}.sh > ${{PROJ_HOME}}/job_out_county/county-{i}.out
@@ -192,7 +192,7 @@ batch.write(f"""#!/bin/bash
 #SBATCH --job-name=Output-county
 #SBATCH --mem=8G
 #SBATCH --partition={config['partition']}
-#SBATCH --output ./job_out_county/output_%j.out
+#SBATCH --output=./job_out_county/output_%j.out
 
 python job-county.py config.json
 """)
@@ -201,7 +201,7 @@ batch.close()
 ## Submit the batch file
 os.system(f"""
 sleep 2
-if [ {maxj} -gt 1 ]; then
+if [ {max_job} -gt 1 ]; then
 JOBID=$(cat ${{PROJ_HOME}}/jobid-county.log | tr '\n' ',' | grep -Po '.*(?=,$)')
 JID=$(sbatch --parsable --dependency=afterok:$(echo ${{JOBID}}) ${{PROJ_HOME}}/job-county.sh)
 echo ${{JID}} >> ${{PROJ_HOME}}/jobid-county.log
@@ -217,11 +217,11 @@ report.write(f"""#!/bin/bash
 #SBATCH --job-name=Report-state-county
 #SBATCH --mem=4G
 #SBATCH --partition={config['partition']}
-#SBATCH --output ./report-state-county-%j.out
+#SBATCH --output=./report-state-county-%j.out
 
 ## Collect jobs with error
 for i in `ls ${{PROJ_HOME}}/job_out_county/county-*.out`; do
-    if grep -iq "ERROR" $i ; then
+    if grep -Piq "ERROR|failed" $i; then
         echo $i | grep -Po "(?<=job_out_county/).*(?=_.*.out$)" >> ${{PROJ_HOME}}/job_out_county/failed-temp.txt
     fi
 done
@@ -273,7 +273,7 @@ report.close()
 ## Submit the batch file
 os.system(f"""
 sleep 2
-if [ {maxj} -gt 1 ]; then
+if [ {max_job} -gt 1 ]; then
 JOBID=$(tail -qn 1 ${{PROJ_HOME}}/jobid-county.log)
 sbatch --parsable --dependency=afterany:$(echo ${{JOBID}}) ${{PROJ_HOME}}/report-county.sh
 else . ${{PROJ_HOME}}/report-county.sh > ${{PROJ_HOME}}/report-state-county-serial.out
