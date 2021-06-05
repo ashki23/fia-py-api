@@ -4,6 +4,7 @@ import os
 import sys
 import time
 import json
+import math
 
 ## Time
 time_pt = time.strftime("%Y%m%d-%H%M%S")
@@ -28,20 +29,20 @@ mv ${{PROJ_HOME}}/job_out_{file_name}/*.* ${{PROJ_HOME}}/job_out_{file_name}/arc
 """)
 
 ## Calculating optimal batch size
-num_query = len(config['attribute_cd']) * len(config['year']) * len(input_data)
-batch_size = max(round(num_query / max_job), 1)
-if batch_size < len(input_data):
-    batch_size += round((len(input_data) % batch_size) / (len(input_data) // batch_size)) + 1
+nrow = len(input_data)
+num_query = len(config['attribute_cd']) * len(config['year']) * nrow
+batch_size = max(math.ceil(num_query / max_job), 1)
+if batch_size < nrow:
+    batch_size += math.ceil((nrow % batch_size) / (nrow // batch_size))
+batch_num = math.ceil(nrow / batch_size)
 
 ## Create batch files to download FIA JSON queries
 for att_cd in config['attribute_cd']:
     att = attribute[str(att_cd)]
     for year in config['year']:
-        i = 0
-        nrow = len(input_data)
-        while i < nrow:
-            select_row = input_data[i:i + batch_size]
-            print('*************', year, att, 'row: ', i, '-', len(select_row), '***************')
+        for i in range(batch_num):
+            select_row = input_data[i * batch_size:(i + 1) * batch_size]
+            print('*************', year, att, file_name, '- batch', i, '***************')
             batch = open(f"./fia_data/job-{file_name}-{att_cd}-{year}-{i}.sh",'w')
             batch.write(f"""#!/bin/bash
 
@@ -52,7 +53,7 @@ for att_cd in config['attribute_cd']:
 #SBATCH --time={config['job_time_hr']}:00:00
 #SBATCH --output=./job_out_{file_name}/{file_name}-{att_cd}-{year}-{i}_%j.out
             """)
-            lnum = 0
+            rnum = 0
             for l in select_row:
                 states_all = [l['state']] + l['neighbors']
                 states_cd = [l['state_cd']] + l['neighbors_cd']
@@ -92,10 +93,10 @@ for att_cd in config['attribute_cd']:
                         yr.append(yr_i)
                     yr = yr[0]
                 
-                lnum += 1
+                rnum += 1
                 file_path = f"${{FIA}}/json/{file_name}_{time_pt}/{att_cd}_{year}_id{l['unit_id']}"
                 batch.write(f"""
-echo "----------------------- {file_name}-{att_cd}-{year}-{i} | {lnum} out of {len(select_row)}"
+echo "----------------------- {file_name}-{att_cd}-{year}-{i} | {rnum} out of {len(select_row)}"
 if [ ! -f {file_path}_{yr}.json ]; then
 wget -c --tries=2 --random-wait "https://apps.fs.usda.gov/Evalidator/rest/Evalidator/fullreport?reptype=Circle&lat={l['lat']}&lon={l['lon']}&radius={l['radius']}&snum={att}&sdenom=No denominator - just produce estimates&wc={','.join(cd_yr)}&pselected=None&rselected=All live stocking&cselected=None&ptime=Current&rtime=Current&ctime=Current&wf=&wnum=&wnumdenom=&FIAorRPA=FIADEF&outputFormat=JSON&estOnly=Y&schemaName=FS_FIADB." -O {file_path}_{yr}.json
 fi
@@ -110,7 +111,6 @@ fi
             else . ${{FIA}}/job-{file_name}-{att_cd}-{year}-{i}.sh > ${{PROJ_HOME}}/job_out_{file_name}/{file_name}-{att_cd}-{year}-{i}.out
             fi
             """)
-            i += batch_size
 
 ## Scritp to extract information and generate outputs
 job = open(f"./job-{file_name}.py",'w')
