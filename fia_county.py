@@ -4,6 +4,7 @@ import os
 import sys
 import csv
 import time
+import math
 import json
 import prep_data
 
@@ -16,7 +17,6 @@ config = json.load(open(sys.argv[1]))
 tol = config['tolerance']
 max_job = int(config['job_number_max'])
 attribute = json.load(open(sys.argv[2]))
-num_query = len(config['attribute_cd']) * len(config['year']) * len(config['state'])
 
 ## Create a dictionary of FIA state codes
 with open('./state_codes.csv', 'r') as cd:
@@ -24,6 +24,7 @@ with open('./state_codes.csv', 'r') as cd:
 
 ## Select states from the config
 state_cd = prep_data.state_config(state_cd,config)
+st_cd = list(state_cd.keys())
 
 ## Create a new directory and and remove log files
 os.system(f"""
@@ -35,67 +36,75 @@ rm ${{PROJ_HOME}}/serial-county-log.out
 mv ${{PROJ_HOME}}/job_out_county/*.* ${{PROJ_HOME}}/job_out_county/archive/{time_pt}
 """)
 
-## Create batch files to download FIA JSON queries
-for i in state_cd.keys():
-    print('************* state:', i, '***************')
-    batch = open(f"./fia_data/job-county-{i}.sh",'w')
-    batch.write(f"""#!/bin/bash
+## Calculating optimal batch size
+nrow = len(st_cd)
+num_query = len(config['attribute_cd']) * len(config['year']) * nrow
+batch_size = max(math.ceil(num_query / max_job), 1)
+if batch_size < nrow:
+    batch_size += math.ceil((nrow % batch_size) / (nrow // batch_size))
+batch_num = math.ceil(nrow / batch_size)
 
-#SBATCH --job-name=county-{i}
+## Create batch files to download FIA JSON queries
+for att_cd in config['attribute_cd']:
+    att = attribute[str(att_cd)]
+    for year in config['year']:
+        for i in range(batch_num):
+            select_state = st_cd[i * batch_size:(i + 1) * batch_size]
+            print('*************', year, att, 'state - batch', i, '***************')
+            batch = open(f"./fia_data/job-county-{att_cd}-{year}-{i}.sh",'w')
+            batch.write(f"""#!/bin/bash
+
+#SBATCH --job-name=county-{att_cd}-{year}-{i}
 #SBATCH --cpus-per-task=1
 #SBATCH --mem=1G
 #SBATCH --partition={config['partition']}
 #SBATCH --time={config['job_time_hr']}:00:00
-#SBATCH --output=./job_out_county/county-{i}_%j.out
-    """)
-    for year in config['year']:
-        invyr_id = os.popen(f"""
-        if [ ! -f ./fia_data/survey/{i}_POP_STRATUM.csv ]; then
-        wget -c -nv --tries=2 https://apps.fs.usda.gov/fia/datamart/CSV/{i}_POP_STRATUM.csv -P ./fia_data/survey; fi
-        awk -F , '{{print $4}}' ./fia_data/survey/{i}_POP_STRATUM.csv | grep ".*01$" | sort | uniq
-        """).read()[:-1].split('\n')
-        
-        if len(invyr_id[0]) == 6:
-            in_yr = [x[2:-2] for x in invyr_id]
-        else:
-            in_yr = [x[1:-2] for x in invyr_id]
-        
-        invyr = [f"20{x}" for x in in_yr if int(x) < int(time_pt[2:4])] + [f"19{x}" for x in in_yr if int(x) > int(time_pt[2:4])]
-        
-        if tol == 0:
-            if str(year) in invyr:
-                yr = year
-                cd_yr = [f"{state_cd[i]}{yr}"]
-            else:
-                print(f"\n-------- Warning: Estimate not available for state {i} for year {year} --------\n")
-                continue
-        else:
-            cd_yr = []
-            diff = [abs(int(x) - year) for x in invyr]
-            indx = diff.index(min(diff))
-            yr = invyr[indx]
-            cd_yr.append(f"{state_cd[i]}{yr}")
-            
-        for att_cd in config['attribute_cd']:
-            att = attribute[str(att_cd)]
-            
-            file_path = f"${{FIA}}/json/county_{time_pt}/{att_cd}_{year}_{i}"
-            batch.write(f"""
-echo "----------------------- county-{i} | {year}-{att_cd}"
-if [ ! -f {file_path}_{yr}.json ]; then
-wget -c --tries=2 --random-wait "https://apps.fs.usda.gov/Evalidator/rest/Evalidator/fullreport?reptype=State&lat=0&lon=0&radius=0&snum={att}&sdenom=No denominator - just produce estimates&wc={','.join(cd_yr)}&pselected=None&rselected=County code and name&cselected=None&ptime=Current&rtime=Current&ctime=Current&wf=&wnum=&wnumdenom=&FIAorRPA=FIADEF&outputFormat=JSON&estOnly=Y&schemaName=FS_FIADB." -O {file_path}_{yr}.json
-fi
+#SBATCH --output=./job_out_county/county-{att_cd}-{year}-{i}_%j.out
             """)
-    batch.close()
+            for st in select_state:
+                invyr_id = os.popen(f"""
+                if [ ! -f ./fia_data/survey/{st}_POP_STRATUM.csv ]; then
+                wget -c -nv --tries=2 https://apps.fs.usda.gov/fia/datamart/CSV/{st}_POP_STRATUM.csv -P ./fia_data/survey; fi
+                awk -F , '{{print $4}}' ./fia_data/survey/{st}_POP_STRATUM.csv | grep ".*01$" | sort | uniq
+                """).read()[:-1].split('\n')
+        
+                if len(invyr_id[0]) == 6:
+                    in_yr = [x[2:-2] for x in invyr_id]
+                else:
+                    in_yr = [x[1:-2] for x in invyr_id]
+                
+                invyr = [f"20{x}" for x in in_yr if int(x) < int(time_pt[2:4])] + [f"19{x}" for x in in_yr if int(x) > int(time_pt[2:4])]
+        
+                if tol == 0:
+                    if str(year) in invyr:
+                        yr = year
+                        cd_yr = [f"{state_cd[st]}{yr}"]
+                    else:
+                        print(f"\n-------- Warning: Estimate not available for state {st} for year {year} --------\n")
+                        continue
+                else:
+                    diff = [abs(int(x) - year) for x in invyr]
+                    indx = diff.index(min(diff))
+                    yr = invyr[indx]
+                    cd_yr = f"{state_cd[st]}{yr}"
+                    
+                file_path = f"${{FIA}}/json/county_{time_pt}/{att_cd}_{year}_{st}"
+                batch.write(f"""
+echo "----------------------- county-{att_cd}-{year}-{i} | {st}"
+if [ ! -f {file_path}_{yr}.json ]; then
+wget -c --tries=2 --random-wait "https://apps.fs.usda.gov/Evalidator/rest/Evalidator/fullreport?reptype=State&lat=0&lon=0&radius=0&snum={att}&sdenom=No denominator - just produce estimates&wc={cd_yr}&pselected=None&rselected=County code and name&cselected=None&ptime=Current&rtime=Current&ctime=Current&wf=&wnum=&wnumdenom=&FIAorRPA=FIADEF&outputFormat=JSON&estOnly=Y&schemaName=FS_FIADB." -O {file_path}_{yr}.json
+fi
+                """)
+            batch.close()
     
-    ## Submit the batch file
-    os.system(f"""
-    if [ {max_job} -gt 1 ]; then
-    JID=$(sbatch --parsable ${{FIA}}/job-county-{i}.sh)
-    echo ${{JID}} >> ${{PROJ_HOME}}/jobid-county.log
-    else . ${{FIA}}/job-county-{i}.sh > ${{PROJ_HOME}}/job_out_county/county-{i}.out
-    fi
-    """)
+            ## Submit the batch file
+            os.system(f"""
+            if [ {max_job} -gt 1 ]; then
+            JID=$(sbatch --parsable ${{FIA}}/job-county-{att_cd}-{year}-{i}.sh)
+            echo ${{JID}} >> ${{PROJ_HOME}}/jobid-county.log
+            else . ${{FIA}}/job-county-{att_cd}-{year}-{i}.sh > ${{PROJ_HOME}}/job_out_county/county-{att_cd}-{year}-{i}.out
+            fi
+            """)
 
 ## Scritp to extract information and generate outputs
 job = open('./job-county.py','w')
