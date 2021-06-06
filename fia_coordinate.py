@@ -145,17 +145,12 @@ for i in json_files:
     lon = js_data['EVALIDatorOutput']['circleLongitude']
     radius = js_data['EVALIDatorOutput']['circleRadiusMiles']
     att_cd = js_data['EVALIDatorOutput']['numeratorAttributeNumber']
-    state_inv = list(js_data['EVALIDatorOutput']['selectedInventories']['stateInventory'])[0].split()
-    state_nm = " ".join([x.capitalize() for x in state_inv[:-1]]).replace('Us', 'U.S.')
-    state = state_abb[state_nm]
-    state_cd = state_inv[-1][:-4]
-    year_survey = state_inv[-1][2:]
     try:
         value = round(js_data['EVALIDatorOutput']['row'][0]['column'][0]['cellValueNumerator'])
     except (TypeError, KeyError):
         print(f"Warning: {{i}} does not have a vaild key or type data.")
         continue
-    att_coordinate[unit_id].update({{'unit_id': unit_id, 'state_name': state_nm, 'state': state, 'state_cd': state_cd, 'lat': lat, 'lon': lon, 'radius': radius, f"{{att_cd}}_{{year}}": value}})
+    att_coordinate[unit_id].update({{'unit_id': unit_id, 'lat': lat, 'lon': lon, 'radius': radius, f"{{att_cd}}_{{year}}": value}})
 
 ## Sorting by keys
 att_coordinate = {{k: att_coordinate[k] for k in sorted(att_coordinate.keys())}}
@@ -166,9 +161,8 @@ with open('./outputs/{file_name}-{time_pt}.json', 'w') as fj:
 
 ## CSV output
 list_coordinate = [x for x in att_coordinate.values()]
-lk = len(config['attribute_cd']) * len(config['year'])
 if len(list_coordinate) > 0:
-    keys = list(list_coordinate[0].keys())[:-lk]
+    keys = ['unit_id','lat','lon','radius']
     with open('./outputs/{file_name}-panel-{time_pt}.csv', 'w') as fp:
         prep_data.list_dict_panel(list_coordinate,keys,config,fp)
     

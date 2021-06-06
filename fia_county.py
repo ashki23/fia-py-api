@@ -136,10 +136,6 @@ for i in json_files:
     year = re.findall('(?<=_)\d{{4}}(?=_.)', i)[0]
     state_abb = js_data['EVALIDatorOutput']['row'][1]['content'].split()[1].upper()
     att_cd = js_data['EVALIDatorOutput']['numeratorAttributeNumber']
-    state_inv = js_data['EVALIDatorOutput']['selectedInventories']['stateInventory'].split()
-    state_nm = " ".join([x.capitalize() for x in state_inv[:-1]]).replace('Us', 'U.S.')
-    state_cd = state_inv[-1][:-4]
-    year_survey = state_inv[-1][2:]
 
     for j in js_data['EVALIDatorOutput']['row']:
         content = j['content'].split()
@@ -149,10 +145,11 @@ for i in json_files:
             print(f"Warning: {{i}} does not have a vaild key or type data.")
             continue
         if content[0] == 'Total':
-            att_state[state_abb].update({{'state': state_abb, 'state_name': state_nm, f"{{att_cd}}_{{year}}": value}})
+            att_state[state_abb].update({{'state': state_abb, f"{{att_cd}}_{{year}}": value}})
         else:
-            county = content[2].capitalize()
-            att_county[f"{{state_abb}}_{{county}}"].update({{'county_cd': content[0], 'county': county, 'state': state_abb, 'state_name': state_nm, f"{{att_cd}}_{{year}}": value}})
+            county = content[2:]
+            county = " ".join([x.capitalize() for x in county])
+            att_county[f"{{state_abb}}_{{county}}"].update({{'county_cd': content[0], 'county': county, 'state': state_abb, f"{{att_cd}}_{{year}}": value}})
 
 ## Sorting by keys
 att_county = {{k: att_county[k] for k in sorted(att_county.keys())}}
@@ -167,9 +164,8 @@ with open('./outputs/state-{time_pt}.json', 'w') as fj:
 
 ## CSV output - county
 list_county = [x for x in att_county.values()]
-lk = len(config['attribute_cd']) * len(config['year'])
 if len(list_county) > 0:
-    county_keys = list(list_county[0].keys())[:-lk]
+    county_keys = ['county_cd','county','state']
     with open('./outputs/county-panel-{time_pt}.csv', 'w') as fp:
         prep_data.list_dict_panel(list_county,county_keys,config,fp)
 
@@ -182,7 +178,7 @@ if len(list_county) > 0:
 ## CSV output - state
 list_state = [x for x in att_state.values()]
 if len(list_state) > 0:
-    state_keys = list(list_state[0].keys())[:-lk]
+    state_keys = ['state']
     with open('./outputs/state-panel-{time_pt}.csv', 'w') as fp:
         prep_data.list_dict_panel(list_state,state_keys,config,fp)
 
