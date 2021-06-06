@@ -11,10 +11,7 @@ year = config['year']
 
 q_type = input('Select the query type (insert one of state, county or coordinate): ').lower().strip()
 
-if q_type not in ['state','county','coordinate']:
-    print("Please select one of the available methods for 'query_type'. Available methods are 'state', 'county', 'coordinate'.")
-
-elif q_type == 'coordinate':
+if q_type == 'coordinate':
     latest = os.popen(f"""
     ls -t ./outputs/coordinate-*.json | head -n 1
     """).read()[:-1]
@@ -42,7 +39,7 @@ elif q_type == 'state':
         database = json.load(db)
     
     ## Input
-    state_in = input('Insert state: ').upper().strip()
+    state_in = input('Insert state (two-letter): ').upper().strip()
         
     ## Query
     if state_in in database.keys():
@@ -50,7 +47,7 @@ elif q_type == 'state':
     else:
         print(f"Sorry! {state_in} is not in the latest database ({latest}).")
     
-else:
+elif q_type == 'county':
     latest = os.popen(f"""
     ls -t ./outputs/county-*.json | head -n 1
     """).read()[:-1]
@@ -59,8 +56,9 @@ else:
         database = json.load(db)
     
     ## Input
-    state_in = input('Insert state: ').upper().strip()
-    county_in = input('Insert county: ').capitalize().strip()
+    state_in = input('Insert state (two-letter): ').upper().strip()
+    county_in = input('Insert county name: ').strip().split()
+    county_in = " ".join([x.capitalize() for x in county_in])
     unit_id = f"{state_in}_{county_in}"
         
     ## Query
@@ -68,3 +66,6 @@ else:
         print(database[unit_id])
     else:
         print(f"Sorry! {county_in},{state_in} is not in the latest database ({latest}).")
+
+else:
+    print("Please select one of the available methods for 'query_type'. Available methods are 'state', 'county', 'coordinate'.")
