@@ -40,7 +40,7 @@ The following shows configurable items and template values:
 - **year:** list of years. For a single year use a singleton list *e.g. [2017]*
 - **state:** list of states. Use `["ALL"]` to include all states in the data. For a single state use a singleton list *e.g. ["MO"]*
 - **attribute_cd:** list of FIA forest attributes code. For a single code use a singleton list *e.g. [7]*
-- **tolerance:** a binary variable of 0 or 1. Set 1 to use the closest available (FIA survey year)[https://apps.fs.usda.gov/fia/datamart/recent_load_history.html] to the listed years, if the listed year is not available in FIA
+- **tolerance:** a binary variable of 0 or 1. Set 1 to use the closest available [FIA survey year](https://apps.fs.usda.gov/fia/datamart/recent_load_history.html) to the listed years, if the listed year is not available
 - **job_number_max:** max number of jobs that can be submitted at the same time. Use 1 for running in serial
 - **job_time_hr:** estimated hours that each job might takes (equivalent to `--time` slurm option). Not required to change for running in serial
 - **partition:** name of the selected partition in the cluster (equivalent to `--partition` slurm option). Not required to change for running in serial
