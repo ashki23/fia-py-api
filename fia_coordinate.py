@@ -81,9 +81,10 @@ for att_cd in config['attribute_cd']:
 
 for i in range(max_job):
     select_qr = query_list[i * batch_size:(i + 1) * batch_size]
-    print('*************', file_name, '- batch', i, '***************')
-    batch = open(f"./fia_data/job-{file_name}-{i}.sh",'w')
-    batch.write(f"""#!/bin/bash
+    if len(select_qr) > 0:
+        print('*************', file_name, '- batch', i, '***************')
+        batch = open(f"./fia_data/job-{file_name}-{i}.sh",'w')
+        batch.write(f"""#!/bin/bash
 
 #SBATCH --job-name={file_name}-{i}
 #SBATCH --cpus-per-task=1
@@ -91,28 +92,28 @@ for i in range(max_job):
 #SBATCH --partition={config['partition']}
 #SBATCH --time={config['job_time_hr']}:00:00
 #SBATCH --output=./job-out-{file_name}/{file_name}-{i}-%j.out
-    """)
+        """)
     
-    rnum = 1
-    for q in select_qr:
-        file_path = f"${{FIA}}/json/{file_name}-{time_pt}/{q['att_cd']}-{q['year']}-id{q['unit_id']}-batch{i}"
-        batch.write(f"""
+        rnum = 1
+        for q in select_qr:
+            file_path = f"${{FIA}}/json/{file_name}-{time_pt}/{q['att_cd']}-{q['year']}-id{q['unit_id']}-batch{i}"
+            batch.write(f"""
 echo "----------------------- {q['att_cd']}-{q['year']}-id{q['unit_id']} | {rnum} out of {len(select_qr)}"
 if [ ! -f {file_path}-{q['yr']}.json ]; then
 wget -c --tries=2 --random-wait "https://apps.fs.usda.gov/Evalidator/rest/Evalidator/fullreport?reptype=Circle&lat={q['lat']}&lon={q['lon']}&radius={q['radius']}&snum={q['att']}&sdenom=No denominator - just produce estimates&wc={','.join(q['cd_yr'])}&pselected=None&rselected=All live stocking&cselected=None&ptime=Current&rtime=Current&ctime=Current&wf=&wnum=&wnumdenom=&FIAorRPA=FIADEF&outputFormat=JSON&estOnly=Y&schemaName=FS_FIADB." -O {file_path}-{q['yr']}.json
 fi
+            """)
+            rnum += 1
+        batch.close()
+        
+        ## Submit the batch file
+        os.system(f"""
+        if [ {max_job} -gt 1 ]; then
+        JID=$(sbatch --parsable ${{FIA}}/job-{file_name}-{i}.sh)
+        echo ${{JID}} >> ${{PROJ_HOME}}/jobid-{file_name}.log
+        else . ${{FIA}}/job-{file_name}-{i}.sh > ${{PROJ_HOME}}/job-out-{file_name}/{file_name}-{i}.out
+        fi
         """)
-        rnum += 1
-    batch.close()
-            
-    ## Submit the batch file
-    os.system(f"""
-    if [ {max_job} -gt 1 ]; then
-    JID=$(sbatch --parsable ${{FIA}}/job-{file_name}-{i}.sh)
-    echo ${{JID}} >> ${{PROJ_HOME}}/jobid-{file_name}.log
-    else . ${{FIA}}/job-{file_name}-{i}.sh > ${{PROJ_HOME}}/job-out-{file_name}/{file_name}-{i}.out
-    fi
-    """)
 
 ## Scritp to extract information and generate outputs
 job = open(f"./job-{file_name}.py",'w')
