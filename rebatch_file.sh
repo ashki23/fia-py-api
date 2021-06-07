@@ -9,10 +9,12 @@ fi
 ## Set env variables
 source environment.sh
 echo ============ Rebatch time: $(date +"%Y-%m-%d-%H:%M")
+dtim=$(date +"%Y%m-%d%H%M")
+install -dvp  ${PROJ_HOME}/job-out-${query_name}/archive/rebatch-${dtim}
 
 ## Remove invalid json files
 for w in $(cat ${PROJ_HOME}/job-out-${query_name}/warning.txt | grep input | grep -Po "(?<=Warning: ).*(?= is)"); do
-rm $w
+rm -v $w
 done
 
 ## For serial mode
@@ -27,11 +29,19 @@ rm ${PROJ_HOME}/jobid-${query_name}-rebatch.log
 
 ## For parallel: resubmit the failed jobs
 for j in $(cat ${PROJ_HOME}/job-out-${query_name}/failed.txt); do
+mv ${PROJ_HOME}/job-out-${query_name}/${j}*.out ${PROJ_HOME}/job-out-${query_name}/archive/rebatch-${dtim}
 JID=$(sbatch --parsable ${FIA}/job-${j}.sh)
 echo ${JID} >> ${PROJ_HOME}/jobid-${query_name}-rebatch.log
 done
 
 ## Re-extract informations from JSON files
-sleep 3
+sleep 2
 JOBID=$(cat ${PROJ_HOME}/jobid-${query_name}-rebatch.log | tr '\n' ',' | grep -Po '.*(?=,$)')
-sbatch --dependency=afterok:$(echo ${JOBID}) ${PROJ_HOME}/job-${query_name}.sh
+JID=$(sbatch --parsable --dependency=afterok:$(echo ${JOBID}) ${PROJ_HOME}/job-${query_name}.sh)
+
+## A new report
+sleep 2
+mv ${PROJ_HOME}/job-out-${query_name}/failed.txt ${PROJ_HOME}/job-out-${query_name}/archive/rebatch-${dtim}
+mv ${PROJ_HOME}/job-out-${query_name}/warning.txt ${PROJ_HOME}/job-out-${query_name}/archive/rebatch-${dtim}
+mv ${PROJ_HOME}/job-out-${query_name}/output-*.out ${PROJ_HOME}/job-out-${query_name}/archive/rebatch-${dtim}
+sbatch --dependency=afterany:$(echo ${JID}) ${PROJ_HOME}/report-${query_name}.sh
