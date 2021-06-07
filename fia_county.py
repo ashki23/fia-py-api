@@ -2,10 +2,9 @@
 
 import os
 import sys
-import csv
 import time
-import math
 import json
+import math
 import prep_data
 
 ## Time
@@ -24,7 +23,7 @@ with open('./state_codes.csv', 'r') as cd:
 
 ## Select states from the config
 state_cd = prep_data.state_config(state_cd,config)
-st_abb = list(state_cd.keys())
+input_state = list(state_cd.keys())
 
 ## Create a new directory and and remove log files
 os.system(f"""
@@ -36,41 +35,47 @@ mv ${{PROJ_HOME}}/job-out-state-county/*.* ${{PROJ_HOME}}/job-out-state-county/a
 """)
 
 ## Calculating optimal batch size
-nrow = len(st_abb)
+nrow = len(input_state)
 num_query = len(config['attribute_cd']) * len(config['year']) * nrow
 batch_size = max(math.ceil(num_query / max_job), 1)
+
+## FIA inventory years for each state
+st_invyr = {}
+for st in input_state:
+    invyr_id = os.popen(f"""
+    if [ ! -f ./fia_data/survey/{st}_POP_STRATUM.csv ]; then
+    wget -c -nv --tries=2 https://apps.fs.usda.gov/fia/datamart/CSV/{st}_POP_STRATUM.csv -P ./fia_data/survey
+    fi
+    awk -F , '{{print $4}}' ./fia_data/survey/{st}_POP_STRATUM.csv | grep ".*01$" | sort | uniq
+    """).read()[:-1].split('\n')
+    
+    if len(invyr_id[0]) == 6:
+        in_yr = [x[2:-2] for x in invyr_id]
+    else:
+        in_yr = [x[1:-2] for x in invyr_id]
+    
+    invyr = [f"20{x}" for x in in_yr if int(x) < int(time_pt[2:4])] + [f"19{x}" for x in in_yr if int(x) > int(time_pt[2:4])]
+    st_invyr[state_cd[st]] = invyr
 
 ## Create batch files to download FIA JSON queries
 query_list = []
 for att_cd in config['attribute_cd']:
     att = attribute[str(att_cd)]
     for year in config['year']:
-        for st in st_abb:
-            invyr_id = os.popen(f"""
-            if [ ! -f ./fia_data/survey/{st}_POP_STRATUM.csv ]; then
-            wget -c -nv --tries=2 https://apps.fs.usda.gov/fia/datamart/CSV/{st}_POP_STRATUM.csv -P ./fia_data/survey; fi
-            awk -F , '{{print $4}}' ./fia_data/survey/{st}_POP_STRATUM.csv | grep ".*01$" | sort | uniq
-            """).read()[:-1].split('\n')
-            
-            if len(invyr_id[0]) == 6:
-                in_yr = [x[2:-2] for x in invyr_id]
-            else:
-                in_yr = [x[1:-2] for x in invyr_id]
-            
-            invyr = [f"20{x}" for x in in_yr if int(x) < int(time_pt[2:4])] + [f"19{x}" for x in in_yr if int(x) > int(time_pt[2:4])]
-            
+        for st in input_state:
+            cd = state_cd[st]
             if tol == 0:
-                if str(year) in invyr:
+                if str(year) in st_invyr[cd]:
                     yr = year
-                    cd_yr = [f"{state_cd[st]}{yr}"]
+                    cd_yr = [f"{cd}{yr}"]
                 else:
                     print(f"\n-------- Warning: Estimate not available for state {st} for year {year} --------\n")
                     continue
             else:
-                diff = [abs(int(x) - year) for x in invyr]
+                diff = [abs(int(x) - year) for x in st_invyr[cd]]
                 indx = diff.index(min(diff))
-                yr = invyr[indx]
-                cd_yr = f"{state_cd[st]}{yr}"
+                yr = st_invyr[cd][indx]
+                cd_yr = f"{cd}{yr}"
                 
             query_dict = {'att_cd': att_cd, 'att': att, 'year': year, 'cd_yr': cd_yr, 'yr': yr, 'st': st}
             query_list.append(query_dict)
@@ -279,11 +284,12 @@ Find the CSV and JSON outputs in (when jobs done with no failure):
 
 Failures can be related to:
     - Unavailability of EVALIDator and the FIADB (check FIA alerts at https://www.fia.fs.fed.us/tools-data/)
-    - Invalid configs (review config.json)
-    - Invalid coordinates (for the 'coodinate' queries)
+    - Download failure
     - Slurm job failure
+    - Invalid configs (review config.json)
+    - Invalid coordinates (review coordinate.csv)
 
-If failures are related to EVALIDator servers or Slurm jobs, consider to run 'rebatch_file.sh' file to resubmit the failed jobs. Otherwise, modify config file and/or input files and resubmit the 'batch_file.sh'.
+If failures are related to EVALIDator servers, downloading JSON file or Slurm jobs, consider to run 'rebatch_file.sh' file to resubmit the failed jobs. Otherwise, modify config file and/or input files and resubmit the 'batch_file.sh'.
 -----------------------------------------------------------------------------------"
 """)
 report.close()
@@ -293,7 +299,7 @@ os.system(f"""
 sleep 2
 if [ {max_job} -gt 1 ]; then
 JOBID=$(tail -qn 1 ${{PROJ_HOME}}/jobid-state-county.log)
-sbatch --parsable --dependency=afterany:$(echo ${{JOBID}}) ${{PROJ_HOME}}/report-state-county.sh
+sbatch --dependency=afterany:$(echo ${{JOBID}}) ${{PROJ_HOME}}/report-state-county.sh
 else . ${{PROJ_HOME}}/report-state-county.sh > ${{PROJ_HOME}}/report-state-county-serial.out
 fi
 """)
