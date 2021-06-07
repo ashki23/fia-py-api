@@ -53,4 +53,9 @@ The workflow includes the following steps:
 - Download required data by Bash
 - Download FIA dataset and generate outputs by Python
 
-You can find the workflow in `batch_file.sh`. After updating `config.json`, run `sbatch batch_file.sh` in a cluster or `source batch_file.sh` in a Unix Shell to submit all jobs and generate outputs. When the database is collected, `python test-db.py` can be used to check the collected information for a coordinate, state or county.
+You can find the workflow in `batch_file.sh`. After updating `config.json`, run `sbatch batch_file.sh` in a cluster or `source batch_file.sh` in a Unix Shell to submit jobs and generate outputs. When jobs are done, see the report of submitted jobs in `report-<query type>-*.out` and use `python test_db.py` to extract the collected information for a coordinate, state or county. The collected databases are avalable under `./output` directory in JSON and CSV formats.
+
+---
+<div align="center">
+Copyright 2020-2021, [Ashkan Mirzaee](https://ashki23.github.io/index.html) | Content is available under [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/) | Sourcecode licensed under [GPL-3.0](https://www.gnu.org/licenses/gpl-3.0.en.html)
+</div>
