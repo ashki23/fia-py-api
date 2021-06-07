@@ -32,85 +32,88 @@ mv ${{PROJ_HOME}}/job_out_{file_name}/*.* ${{PROJ_HOME}}/job_out_{file_name}/arc
 nrow = len(input_data)
 num_query = len(config['attribute_cd']) * len(config['year']) * nrow
 batch_size = max(math.ceil(num_query / max_job), 1)
-if batch_size < nrow:
-    batch_size += math.ceil((nrow % batch_size) / (nrow // batch_size))
-batch_num = math.ceil(nrow / batch_size)
 
 ## Create batch files to download FIA JSON queries
+query_list = []
 for att_cd in config['attribute_cd']:
     att = attribute[str(att_cd)]
     for year in config['year']:
-        for i in range(batch_num):
-            select_row = input_data[i * batch_size:(i + 1) * batch_size]
-            print('*************', year, att, file_name, '- batch', i, '***************')
-            batch = open(f"./fia_data/job-{file_name}-{att_cd}-{year}-{i}.sh",'w')
-            batch.write(f"""#!/bin/bash
+        for l in input_data:
+            states_all = [l['state']] + l['neighbors']
+            states_cd = [l['state_cd']] + l['neighbors_cd']
+            
+            st_invyr = {}
+            for st in states_all:
+                invyr_id = os.popen(f"""
+                if [ ! -f ./fia_data/survey/{st}_POP_STRATUM.csv ]; then
+                wget -c -nv --tries=2 https://apps.fs.usda.gov/fia/datamart/CSV/{st}_POP_STRATUM.csv -P ./fia_data/survey
+                fi
+                awk -F , '{{print $4}}' ./fia_data/survey/{st}_POP_STRATUM.csv | grep ".*01$" | sort | uniq
+                """).read()[:-1].split('\n')
+                
+                if len(invyr_id[0]) == 6:
+                    in_yr = [x[2:-2] for x in invyr_id]
+                else:
+                    in_yr = [x[1:-2] for x in invyr_id]
+                
+                invyr = [f"20{x}" for x in in_yr if int(x) < int(time_pt[2:4])] + [f"19{x}" for x in in_yr if int(x) > int(time_pt[2:4])]
+                st_invyr[states_cd[states_all.index(st)]] = invyr
+                
+            if tol == 0:
+                if str(year) in st_invyr[l['state_cd']]:
+                    yr = year
+                    cd_yr = [f"{x}{yr}" for x in states_cd]
+                else:
+                    print(f"\n-------- Warning: Estimate not available for state {l['state']} for year {year} --------\n")
+                    continue
+            else:
+                cd_yr = []
+                yr = []
+                for si in st_invyr.keys():
+                    diff = [abs(int(x) - year) for x in st_invyr[si]]
+                    indx = diff.index(min(diff))
+                    yr_i = st_invyr[si][indx]
+                    cd_yr.append(f"{si}{yr_i}")
+                    yr.append(yr_i)
+                yr = yr[0]
+                
+            query_dict = {'att_cd': att_cd, 'att': att, 'year': year, 'cd_yr': cd_yr, 'yr': yr, 'unit_id': l['unit_id'], 'lat': l['lat'], 'lon': l['lon'], 'radius': l['radius']}
+            query_list.append(query_dict)
 
-#SBATCH --job-name={file_name}-{att_cd}-{year}-{i}
+for i in range(max_job):
+    select_qr = query_list[i * batch_size:(i + 1) * batch_size]
+    print('*************', file_name, '- batch', i, '***************')
+    batch = open(f"./fia_data/job-{file_name}-{i}.sh",'w')
+    batch.write(f"""#!/bin/bash
+
+#SBATCH --job-name={file_name}-{i}
 #SBATCH --cpus-per-task=1
 #SBATCH --mem=1G
 #SBATCH --partition={config['partition']}
 #SBATCH --time={config['job_time_hr']}:00:00
-#SBATCH --output=./job_out_{file_name}/{file_name}-{att_cd}-{year}-{i}_%j.out
-            """)
-            rnum = 0
-            for l in select_row:
-                states_all = [l['state']] + l['neighbors']
-                states_cd = [l['state_cd']] + l['neighbors_cd']
-                
-                st_invyr = {}
-                for st in states_all:
-                    invyr_id = os.popen(f"""
-                    if [ ! -f ./fia_data/survey/{st}_POP_STRATUM.csv ]; then
-                    wget -c -nv --tries=2 https://apps.fs.usda.gov/fia/datamart/CSV/{st}_POP_STRATUM.csv -P ./fia_data/survey
-                    fi
-                    awk -F , '{{print $4}}' ./fia_data/survey/{st}_POP_STRATUM.csv | grep ".*01$" | sort | uniq
-                    """).read()[:-1].split('\n')
-                    
-                    if len(invyr_id[0]) == 6:
-                        in_yr = [x[2:-2] for x in invyr_id]
-                    else:
-                        in_yr = [x[1:-2] for x in invyr_id]
-                    
-                    invyr = [f"20{x}" for x in in_yr if int(x) < int(time_pt[2:4])] + [f"19{x}" for x in in_yr if int(x) > int(time_pt[2:4])]
-                    st_invyr[states_cd[states_all.index(st)]] = invyr
-                    
-                if tol == 0:
-                    if str(year) in st_invyr[l['state_cd']]:
-                        yr = year
-                        cd_yr = [f"{x}{yr}" for x in states_cd]
-                    else:
-                        print(f"\n-------- Warning: Estimate not available for state {l['state']} for year {year} --------\n")
-                        continue
-                else:
-                    cd_yr = []
-                    yr = []
-                    for si in st_invyr.keys():
-                        diff = [abs(int(x) - year) for x in st_invyr[si]]
-                        indx = diff.index(min(diff))
-                        yr_i = st_invyr[si][indx]
-                        cd_yr.append(f"{si}{yr_i}")
-                        yr.append(yr_i)
-                    yr = yr[0]
-                
-                rnum += 1
-                file_path = f"${{FIA}}/json/{file_name}_{time_pt}/{att_cd}_{year}_id{l['unit_id']}"
-                batch.write(f"""
-echo "----------------------- {file_name}-{att_cd}-{year}-{i} | {rnum} out of {len(select_row)}"
-if [ ! -f {file_path}_{yr}.json ]; then
-wget -c --tries=2 --random-wait "https://apps.fs.usda.gov/Evalidator/rest/Evalidator/fullreport?reptype=Circle&lat={l['lat']}&lon={l['lon']}&radius={l['radius']}&snum={att}&sdenom=No denominator - just produce estimates&wc={','.join(cd_yr)}&pselected=None&rselected=All live stocking&cselected=None&ptime=Current&rtime=Current&ctime=Current&wf=&wnum=&wnumdenom=&FIAorRPA=FIADEF&outputFormat=JSON&estOnly=Y&schemaName=FS_FIADB." -O {file_path}_{yr}.json
+#SBATCH --output=./job_out_{file_name}/{file_name}-{i}_%j.out
+    """)
+    
+    rnum = 1
+    for q in select_qr:
+        file_path = f"${{FIA}}/json/{file_name}_{time_pt}/{q['att_cd']}_{q['year']}_id{q['unit_id']}"
+        batch.write(f"""
+echo "----------------------- {q['att_cd']}-{q['year']}-id{q['unit_id']} | {rnum} out of {len(select_qr)}"
+if [ ! -f {file_path}_{q['yr']}.json ]; then
+wget -c --tries=2 --random-wait "https://apps.fs.usda.gov/Evalidator/rest/Evalidator/fullreport?reptype=Circle&lat={q['lat']}&lon={q['lon']}&radius={q['radius']}&snum={q['att']}&sdenom=No denominator - just produce estimates&wc={','.join(q['cd_yr'])}&pselected=None&rselected=All live stocking&cselected=None&ptime=Current&rtime=Current&ctime=Current&wf=&wnum=&wnumdenom=&FIAorRPA=FIADEF&outputFormat=JSON&estOnly=Y&schemaName=FS_FIADB." -O {file_path}_{q['yr']}.json
 fi
-                """)
-            batch.close()
+        """)
+        rnum += 1
+    batch.close()
             
-            ## Submit the batch file
-            os.system(f"""
-            if [ {max_job} -gt 1 ]; then
-            JID=$(sbatch --parsable ${{FIA}}/job-{file_name}-{att_cd}-{year}-{i}.sh)
-            echo ${{JID}} >> ${{PROJ_HOME}}/jobid-{file_name}.log
-            else . ${{FIA}}/job-{file_name}-{att_cd}-{year}-{i}.sh > ${{PROJ_HOME}}/job_out_{file_name}/{file_name}-{att_cd}-{year}-{i}.out
-            fi
-            """)
+    ## Submit the batch file
+    os.system(f"""
+    if [ {max_job} -gt 1 ]; then
+    JID=$(sbatch --parsable ${{FIA}}/job-{file_name}-{i}.sh)
+    echo ${{JID}} >> ${{PROJ_HOME}}/jobid-{file_name}.log
+    else . ${{FIA}}/job-{file_name}-{i}.sh > ${{PROJ_HOME}}/job_out_{file_name}/{file_name}-{i}.out
+    fi
+    """)
 
 ## Scritp to extract information and generate outputs
 job = open(f"./job-{file_name}.py",'w')
@@ -236,22 +239,21 @@ Number of warnings: `cat ${{PROJ_HOME}}/job_out_{file_name}/warning.txt | wc -l`
 Number of failed jobs: `cat ${{PROJ_HOME}}/job_out_{file_name}/failed.txt | wc -l`
 
 Find name of jobs with a warning or failure in:
-     - ./job_out_{file_name}/warning.txt
-     - ./job_out_{file_name}/failed.txt
+    - ./job_out_{file_name}/warning.txt
+    - ./job_out_{file_name}/failed.txt
 
 Find the CSV and JSON outputs in (when jobs done with no failure):
-      - ./outputs/{file_name}-{time_pt}.csv
-      - ./outputs/{file_name}-panel-{time_pt}.csv
-      - ./outputs/{file_name}-{time_pt}.json
+    - ./outputs/{file_name}-{time_pt}.csv
+    - ./outputs/{file_name}-panel-{time_pt}.csv
+    - ./outputs/{file_name}-{time_pt}.json
 
 Failures can be related to:
+    - Unavailability of EVALIDator and the FIADB (check FIA alerts at https://www.fia.fs.fed.us/tools-data/)
+    - Invalid configs (review config.json)
+    - Invalid coordinates (for the 'coodinate' queries)
+    - Slurm job failure
 
-      - EVALIDator and the FIADB may be unavailable during this time
-      - Config file inputs may be unvaild
-      - Input coordinates may be unvalid (for the 'coodinate' query type)
-      - Slurm job failure
-
-If the failure is related to EVALIDator servers or Slurm jobs, consider to run 'rebatch_file.sh' file to resubmit the failed jobs. Otherwise, modify config file and/or input files and resubmit the 'batch_file.sh'.
+If failures are related to EVALIDator servers or Slurm jobs, consider to run 'rebatch_file.sh' file to resubmit the failed jobs. Otherwise, modify config file and/or input files and resubmit the 'batch_file.sh'.
 -----------------------------------------------------------------------------------"
 """)
 report.close()

@@ -24,90 +24,95 @@ with open('./state_codes.csv', 'r') as cd:
 
 ## Select states from the config
 state_cd = prep_data.state_config(state_cd,config)
-st_cd = list(state_cd.keys())
+st_abb = list(state_cd.keys())
 
 ## Create a new directory and and remove log files
 os.system(f"""
-install -dvp ${{FIA}}/json/county_{time_pt}
-install -dvp ${{PROJ_HOME}}/job_out_county/archive/{time_pt}
-rm ${{FIA}}/job-county-*
-rm ${{PROJ_HOME}}/jobid-county.log
+install -dvp ${{FIA}}/json/state_county_{time_pt}
+install -dvp ${{PROJ_HOME}}/job_out_state_county/archive/{time_pt}
+rm ${{FIA}}/job-state-county-*
+rm ${{PROJ_HOME}}/jobid-state-county.log
 rm ${{PROJ_HOME}}/serial-county-log.out
-mv ${{PROJ_HOME}}/job_out_county/*.* ${{PROJ_HOME}}/job_out_county/archive/{time_pt}
+mv ${{PROJ_HOME}}/job_out_state_county/*.* ${{PROJ_HOME}}/job_out_state_county/archive/{time_pt}
 """)
 
 ## Calculating optimal batch size
-nrow = len(st_cd)
+nrow = len(st_abb)
 num_query = len(config['attribute_cd']) * len(config['year']) * nrow
 batch_size = max(math.ceil(num_query / max_job), 1)
-if batch_size < nrow:
-    batch_size += math.ceil((nrow % batch_size) / (nrow // batch_size))
-batch_num = math.ceil(nrow / batch_size)
 
 ## Create batch files to download FIA JSON queries
+query_list = []
 for att_cd in config['attribute_cd']:
     att = attribute[str(att_cd)]
     for year in config['year']:
-        for i in range(batch_num):
-            select_state = st_cd[i * batch_size:(i + 1) * batch_size]
-            print('*************', year, att, 'state - batch', i, '***************')
-            batch = open(f"./fia_data/job-county-{att_cd}-{year}-{i}.sh",'w')
-            batch.write(f"""#!/bin/bash
+        for st in st_abb:
+            invyr_id = os.popen(f"""
+            if [ ! -f ./fia_data/survey/{st}_POP_STRATUM.csv ]; then
+            wget -c -nv --tries=2 https://apps.fs.usda.gov/fia/datamart/CSV/{st}_POP_STRATUM.csv -P ./fia_data/survey; fi
+            awk -F , '{{print $4}}' ./fia_data/survey/{st}_POP_STRATUM.csv | grep ".*01$" | sort | uniq
+            """).read()[:-1].split('\n')
+            
+            if len(invyr_id[0]) == 6:
+                in_yr = [x[2:-2] for x in invyr_id]
+            else:
+                in_yr = [x[1:-2] for x in invyr_id]
+            
+            invyr = [f"20{x}" for x in in_yr if int(x) < int(time_pt[2:4])] + [f"19{x}" for x in in_yr if int(x) > int(time_pt[2:4])]
+            
+            if tol == 0:
+                if str(year) in invyr:
+                    yr = year
+                    cd_yr = [f"{state_cd[st]}{yr}"]
+                else:
+                    print(f"\n-------- Warning: Estimate not available for state {st} for year {year} --------\n")
+                    continue
+            else:
+                diff = [abs(int(x) - year) for x in invyr]
+                indx = diff.index(min(diff))
+                yr = invyr[indx]
+                cd_yr = f"{state_cd[st]}{yr}"
+                
+            query_dict = {'att_cd': att_cd, 'att': att, 'year': year, 'cd_yr': cd_yr, 'yr': yr, 'st': st}
+            query_list.append(query_dict)
 
-#SBATCH --job-name=county-{att_cd}-{year}-{i}
+for i in range(max_job):
+    select_qr = query_list[i * batch_size:(i + 1) * batch_size]
+    print('*************', 'state/county - batch', i, '***************')
+    batch = open(f"./fia_data/job-state-county-{i}.sh",'w')
+    batch.write(f"""#!/bin/bash
+
+#SBATCH --job-name=state-county-{i}
 #SBATCH --cpus-per-task=1
 #SBATCH --mem=1G
 #SBATCH --partition={config['partition']}
 #SBATCH --time={config['job_time_hr']}:00:00
-#SBATCH --output=./job_out_county/county-{att_cd}-{year}-{i}_%j.out
-            """)
-            for st in select_state:
-                invyr_id = os.popen(f"""
-                if [ ! -f ./fia_data/survey/{st}_POP_STRATUM.csv ]; then
-                wget -c -nv --tries=2 https://apps.fs.usda.gov/fia/datamart/CSV/{st}_POP_STRATUM.csv -P ./fia_data/survey; fi
-                awk -F , '{{print $4}}' ./fia_data/survey/{st}_POP_STRATUM.csv | grep ".*01$" | sort | uniq
-                """).read()[:-1].split('\n')
-        
-                if len(invyr_id[0]) == 6:
-                    in_yr = [x[2:-2] for x in invyr_id]
-                else:
-                    in_yr = [x[1:-2] for x in invyr_id]
-                
-                invyr = [f"20{x}" for x in in_yr if int(x) < int(time_pt[2:4])] + [f"19{x}" for x in in_yr if int(x) > int(time_pt[2:4])]
-        
-                if tol == 0:
-                    if str(year) in invyr:
-                        yr = year
-                        cd_yr = [f"{state_cd[st]}{yr}"]
-                    else:
-                        print(f"\n-------- Warning: Estimate not available for state {st} for year {year} --------\n")
-                        continue
-                else:
-                    diff = [abs(int(x) - year) for x in invyr]
-                    indx = diff.index(min(diff))
-                    yr = invyr[indx]
-                    cd_yr = f"{state_cd[st]}{yr}"
-                    
-                file_path = f"${{FIA}}/json/county_{time_pt}/{att_cd}_{year}_{st}"
-                batch.write(f"""
-echo "----------------------- county-{att_cd}-{year}-{i} | {st}"
-if [ ! -f {file_path}_{yr}.json ]; then
-wget -c --tries=2 --random-wait "https://apps.fs.usda.gov/Evalidator/rest/Evalidator/fullreport?reptype=State&lat=0&lon=0&radius=0&snum={att}&sdenom=No denominator - just produce estimates&wc={cd_yr}&pselected=None&rselected=County code and name&cselected=None&ptime=Current&rtime=Current&ctime=Current&wf=&wnum=&wnumdenom=&FIAorRPA=FIADEF&outputFormat=JSON&estOnly=Y&schemaName=FS_FIADB." -O {file_path}_{yr}.json
-fi
-                """)
-            batch.close()
+#SBATCH --output=./job_out_state_county/state-county-{i}_%j.out
+    """)
     
-            ## Submit the batch file
-            os.system(f"""
-            if [ {max_job} -gt 1 ]; then
-            JID=$(sbatch --parsable ${{FIA}}/job-county-{att_cd}-{year}-{i}.sh)
-            echo ${{JID}} >> ${{PROJ_HOME}}/jobid-county.log
-            else . ${{FIA}}/job-county-{att_cd}-{year}-{i}.sh > ${{PROJ_HOME}}/job_out_county/county-{att_cd}-{year}-{i}.out
-            fi
-            """)
+    rnum = 1
+    for q in select_qr:
+        file_path = f"${{FIA}}/json/state_county_{time_pt}/{q['att_cd']}_{q['year']}_{q['st']}"
+        batch.write(f"""
+echo "----------------------- {q['att_cd']}-{q['year']}-{q['st']} | {rnum} out of {len(select_qr)}"
+if [ ! -f {file_path}_{q['yr']}.json ]; then
+wget -c --tries=2 --random-wait "https://apps.fs.usda.gov/Evalidator/rest/Evalidator/fullreport?reptype=State&lat=0&lon=0&radius=0&snum={q['att']}&sdenom=No denominator - just produce estimates&wc={q['cd_yr']}&pselected=None&rselected=County code and name&cselected=None&ptime=Current&rtime=Current&ctime=Current&wf=&wnum=&wnumdenom=&FIAorRPA=FIADEF&outputFormat=JSON&estOnly=Y&schemaName=FS_FIADB." -O {file_path}_{q['yr']}.json
+fi
+        """)
+        rnum += 1
+    batch.close()
+    
+    ## Submit the batch file
+    os.system(f"""
+    if [ {max_job} -gt 1 ]; then
+    JID=$(sbatch --parsable ${{FIA}}/job-state-county-{i}.sh)
+    echo ${{JID}} >> ${{PROJ_HOME}}/jobid-state-county.log
+    else . ${{FIA}}/job-state-county-{i}.sh > ${{PROJ_HOME}}/job_out_state_county/state-county-{i}.out
+    fi
+    """)
 
 ## Scritp to extract information and generate outputs
-job = open('./job-county.py','w')
+job = open('./job-state-county.py','w')
 job.write(f"""#!/usr/bin/env python
 
 import re
@@ -120,7 +125,7 @@ import prep_data
 import collections
 
 config = json.load(open(sys.argv[1]))
-json_files = glob.glob('./fia_data/json/county_{time_pt}/*.json')
+json_files = glob.glob('./fia_data/json/state_county_{time_pt}/*.json')
 att_county = collections.defaultdict(dict)
 att_state = collections.defaultdict(dict)
 
@@ -191,15 +196,15 @@ if len(list_state) > 0:
 job.close()
 
 ## Create a batch file
-batch = open('./job-county.sh','w')
+batch = open('./job-state-county.sh','w')
 batch.write(f"""#!/bin/bash
 
-#SBATCH --job-name=Output-county
+#SBATCH --job-name=Output-state-county
 #SBATCH --mem=8G
 #SBATCH --partition={config['partition']}
-#SBATCH --output=./job_out_county/output_%j.out
+#SBATCH --output=./job_out_state_county/output_%j.out
 
-python job-county.py config.json
+python job-state-county.py config.json
 """)
 batch.close()
 
@@ -207,16 +212,16 @@ batch.close()
 os.system(f"""
 sleep 2
 if [ {max_job} -gt 1 ]; then
-JOBID=$(cat ${{PROJ_HOME}}/jobid-county.log | tr '\n' ',' | grep -Po '.*(?=,$)')
-JID=$(sbatch --parsable --dependency=afterok:$(echo ${{JOBID}}) ${{PROJ_HOME}}/job-county.sh)
-echo ${{JID}} >> ${{PROJ_HOME}}/jobid-county.log
-else . ${{PROJ_HOME}}/job-county.sh > ${{PROJ_HOME}}/job_out_county/output_serial.out
+JOBID=$(cat ${{PROJ_HOME}}/jobid-state-county.log | tr '\n' ',' | grep -Po '.*(?=,$)')
+JID=$(sbatch --parsable --dependency=afterok:$(echo ${{JOBID}}) ${{PROJ_HOME}}/job-state-county.sh)
+echo ${{JID}} >> ${{PROJ_HOME}}/jobid-state-county.log
+else . ${{PROJ_HOME}}/job-state-county.sh > ${{PROJ_HOME}}/job_out_state_county/output_serial.out
 fi
 sleep 2
 """)
 
 ## Create a batch file to collect reports
-report = open(f"./report-county.sh",'w')
+report = open(f"./report-state-county.sh",'w')
 report.write(f"""#!/bin/bash
 
 #SBATCH --job-name=Report-state-county
@@ -225,52 +230,51 @@ report.write(f"""#!/bin/bash
 #SBATCH --output=./report-state-county-%j.out
 
 ## Collect jobs with error
-for i in `ls ${{PROJ_HOME}}/job_out_county/county-*.out`; do
+for i in `ls ${{PROJ_HOME}}/job_out_state_county/state-county-*.out`; do
     if grep -Piq "ERROR|failed" $i; then
-        echo $i | grep -Po "(?<=job_out_county/).*(?=_.*.out$)" >> ${{PROJ_HOME}}/job_out_county/failed-temp.txt
+        echo $i | grep -Po "(?<=job_out_state_county/).*(?=_.*.out$)" >> ${{PROJ_HOME}}/job_out_state_county/failed-temp.txt
     fi
 done
 
 if [ `jq ."job_number_max" config.json` -gt 1 ]; then
 ## Collecting failed and timeout Slurm jobs
-sacct -XP --state F,TO --noheader --starttime {time_ptr} --format JobName | grep "county" >> ${{PROJ_HOME}}/job_out_county/failed-temp.txt
+sacct -XP --state F,TO --noheader --starttime {time_ptr} --format JobName | grep "county" >> ${{PROJ_HOME}}/job_out_state_county/failed-temp.txt
 fi
 
 sleep 1
-sort ${{PROJ_HOME}}/job_out_county/failed-temp.txt | uniq > ${{PROJ_HOME}}/job_out_county/failed.txt
-rm ${{PROJ_HOME}}/job_out_county/failed-temp.txt
+sort ${{PROJ_HOME}}/job_out_state_county/failed-temp.txt | uniq > ${{PROJ_HOME}}/job_out_state_county/failed.txt
+rm ${{PROJ_HOME}}/job_out_state_county/failed-temp.txt
 
 ## Collect warnings
-grep -i "warning" ${{PROJ_HOME}}/job_out_county/output_*.out > ${{PROJ_HOME}}/job_out_county/warning.txt
+grep -i "warning" ${{PROJ_HOME}}/job_out_state_county/output_*.out > ${{PROJ_HOME}}/job_out_state_county/warning.txt
 sleep 1
 
 echo "-----------------------------------------------------------------------------------
 Job(s) start time: {time_ptr}
 Number of queries: {num_query}
-Number of jobs: `ls ${{PROJ_HOME}}/job_out_county/*.out | wc -l`
-Number of warnings: `cat ${{PROJ_HOME}}/job_out_county/warning.txt | wc -l`
-Number of failed jobs: `cat ${{PROJ_HOME}}/job_out_county/failed.txt | wc -l`
+Number of jobs: `ls ${{PROJ_HOME}}/job_out_state_county/*.out | wc -l`
+Number of warnings: `cat ${{PROJ_HOME}}/job_out_state_county/warning.txt | wc -l`
+Number of failed jobs: `cat ${{PROJ_HOME}}/job_out_state_county/failed.txt | wc -l`
 
 Find name of jobs with a warning or failure in:
-     - ./job_out_county/warning.txt
-     - ./job_out_county/failed.txt
+    - ./job_out_state_county/warning.txt
+    - ./job_out_state_county/failed.txt
 
 Find the CSV and JSON outputs in (when jobs done with no failure):
-      - ./outputs/county-{time_pt}.csv
-      - ./outputs/county-panel-{time_pt}.csv
-      - ./outputs/county-{time_pt}.json
-      - ./outputs/state-{time_pt}.csv
-      - ./outputs/state-panel-{time_pt}.csv
-      - ./outputs/state-{time_pt}.json
+    - ./outputs/county-{time_pt}.csv
+    - ./outputs/county-panel-{time_pt}.csv
+    - ./outputs/county-{time_pt}.json
+    - ./outputs/state-{time_pt}.csv
+    - ./outputs/state-panel-{time_pt}.csv
+    - ./outputs/state-{time_pt}.json
 
 Failures can be related to:
+    - Unavailability of EVALIDator and the FIADB (check FIA alerts at https://www.fia.fs.fed.us/tools-data/)
+    - Invalid configs (review config.json)
+    - Invalid coordinates (for the 'coodinate' queries)
+    - Slurm job failure
 
-      - EVALIDator and the FIADB may be unavailable during this time
-      - Config file inputs may be unvaild
-      - Input coordinates may be unvalid (for the 'coodinate' query type)
-      - Slurm job failure
-
-If the failure is related to EVALIDator servers or Slurm jobs, consider to run 'rebatch_file.sh' file to resubmit the failed jobs. Otherwise, modify config file and/or input files and resubmit the 'batch_file.sh'.
+If failures are related to EVALIDator servers or Slurm jobs, consider to run 'rebatch_file.sh' file to resubmit the failed jobs. Otherwise, modify config file and/or input files and resubmit the 'batch_file.sh'.
 -----------------------------------------------------------------------------------"
 """)
 report.close()
@@ -279,8 +283,8 @@ report.close()
 os.system(f"""
 sleep 2
 if [ {max_job} -gt 1 ]; then
-JOBID=$(tail -qn 1 ${{PROJ_HOME}}/jobid-county.log)
-sbatch --parsable --dependency=afterany:$(echo ${{JOBID}}) ${{PROJ_HOME}}/report-county.sh
-else . ${{PROJ_HOME}}/report-county.sh > ${{PROJ_HOME}}/report-state-county-serial.out
+JOBID=$(tail -qn 1 ${{PROJ_HOME}}/jobid-state-county.log)
+sbatch --parsable --dependency=afterany:$(echo ${{JOBID}}) ${{PROJ_HOME}}/report-state-county.sh
+else . ${{PROJ_HOME}}/report-state-county.sh > ${{PROJ_HOME}}/report-state-county-serial.out
 fi
 """)
