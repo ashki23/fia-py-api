@@ -20,12 +20,11 @@ file_name = sys.argv[3].split('.')[0]
 
 ## Create a new directory and and remove log files
 os.system(f"""
-install -dvp ${{FIA}}/json/{file_name}_{time_pt}
-install -dvp ${{PROJ_HOME}}/job_out_{file_name}/archive/{time_pt}
+install -dvp ${{FIA}}/json/{file_name}-{time_pt}
+install -dvp ${{PROJ_HOME}}/job-out-{file_name}/archive/{time_pt}
 rm ${{FIA}}/job-{file_name}-*
 rm ${{PROJ_HOME}}/jobid-{file_name}.log
-rm ${{PROJ_HOME}}/serial-{file_name}-log.out
-mv ${{PROJ_HOME}}/job_out_{file_name}/*.* ${{PROJ_HOME}}/job_out_{file_name}/archive/{time_pt}
+mv ${{PROJ_HOME}}/job-out-{file_name}/*.* ${{PROJ_HOME}}/job-out-{file_name}/archive/{time_pt}
 """)
 
 ## Calculating optimal batch size
@@ -91,16 +90,16 @@ for i in range(max_job):
 #SBATCH --mem=1G
 #SBATCH --partition={config['partition']}
 #SBATCH --time={config['job_time_hr']}:00:00
-#SBATCH --output=./job_out_{file_name}/{file_name}-{i}_%j.out
+#SBATCH --output=./job-out-{file_name}/{file_name}-{i}-%j.out
     """)
     
     rnum = 1
     for q in select_qr:
-        file_path = f"${{FIA}}/json/{file_name}_{time_pt}/{q['att_cd']}_{q['year']}_id{q['unit_id']}"
+        file_path = f"${{FIA}}/json/{file_name}-{time_pt}/{q['att_cd']}-{q['year']}-id{q['unit_id']}-batch{i}"
         batch.write(f"""
 echo "----------------------- {q['att_cd']}-{q['year']}-id{q['unit_id']} | {rnum} out of {len(select_qr)}"
-if [ ! -f {file_path}_{q['yr']}.json ]; then
-wget -c --tries=2 --random-wait "https://apps.fs.usda.gov/Evalidator/rest/Evalidator/fullreport?reptype=Circle&lat={q['lat']}&lon={q['lon']}&radius={q['radius']}&snum={q['att']}&sdenom=No denominator - just produce estimates&wc={','.join(q['cd_yr'])}&pselected=None&rselected=All live stocking&cselected=None&ptime=Current&rtime=Current&ctime=Current&wf=&wnum=&wnumdenom=&FIAorRPA=FIADEF&outputFormat=JSON&estOnly=Y&schemaName=FS_FIADB." -O {file_path}_{q['yr']}.json
+if [ ! -f {file_path}-{q['yr']}.json ]; then
+wget -c --tries=2 --random-wait "https://apps.fs.usda.gov/Evalidator/rest/Evalidator/fullreport?reptype=Circle&lat={q['lat']}&lon={q['lon']}&radius={q['radius']}&snum={q['att']}&sdenom=No denominator - just produce estimates&wc={','.join(q['cd_yr'])}&pselected=None&rselected=All live stocking&cselected=None&ptime=Current&rtime=Current&ctime=Current&wf=&wnum=&wnumdenom=&FIAorRPA=FIADEF&outputFormat=JSON&estOnly=Y&schemaName=FS_FIADB." -O {file_path}-{q['yr']}.json
 fi
         """)
         rnum += 1
@@ -111,7 +110,7 @@ fi
     if [ {max_job} -gt 1 ]; then
     JID=$(sbatch --parsable ${{FIA}}/job-{file_name}-{i}.sh)
     echo ${{JID}} >> ${{PROJ_HOME}}/jobid-{file_name}.log
-    else . ${{FIA}}/job-{file_name}-{i}.sh > ${{PROJ_HOME}}/job_out_{file_name}/{file_name}-{i}.out
+    else . ${{FIA}}/job-{file_name}-{i}.sh > ${{PROJ_HOME}}/job-out-{file_name}/{file_name}-{i}.out
     fi
     """)
 
@@ -129,7 +128,7 @@ import prep_data
 import collections
 
 config = json.load(open(sys.argv[1]))
-json_files = glob.glob('./fia_data/json/{file_name}_{time_pt}/*.json')
+json_files = glob.glob('./fia_data/json/{file_name}-{time_pt}/*.json')
 state_abb = prep_data.csv_dict(open('./state_abb.csv'))
 att_coordinate = collections.defaultdict(dict)
 
@@ -142,8 +141,8 @@ for i in json_files:
         continue
 
     n = os.path.basename(i)
-    year = re.findall('(?<=_)\d{{4}}(?=_.)', i)[0]
-    unit_id = re.findall('(?<=id)\d*(?=_)', i)[0]
+    year = re.findall('(?<=-)\d{{4}}(?=-.)', i)[0]
+    unit_id = re.findall('(?<=id)\d*(?=-)', i)[0]
     lat = js_data['EVALIDatorOutput']['circleLatitude']
     lon = js_data['EVALIDatorOutput']['circleLongitude']
     radius = js_data['EVALIDatorOutput']['circleRadiusMiles']
@@ -184,7 +183,7 @@ batch.write(f"""#!/bin/bash
 #SBATCH --job-name=Output-{file_name}
 #SBATCH --mem=8G
 #SBATCH --partition={config['partition']}
-#SBATCH --output=./job_out_{file_name}/output_%j.out
+#SBATCH --output=./job-out-{file_name}/output-%j.out
 
 python job-{file_name}.py config.json
 """)
@@ -197,7 +196,7 @@ if [ {max_job} -gt 1 ]; then
 JOBID=$(cat ${{PROJ_HOME}}/jobid-{file_name}.log | tr '\n' ',' | grep -Po '.*(?=,$)')
 JID=$(sbatch --parsable --dependency=afterok:$(echo ${{JOBID}}) ${{PROJ_HOME}}/job-{file_name}.sh)
 echo ${{JID}} >> ${{PROJ_HOME}}/jobid-{file_name}.log
-else . ${{PROJ_HOME}}/job-{file_name}.sh > ${{PROJ_HOME}}/job_out_{file_name}/output_serial.out
+else . ${{PROJ_HOME}}/job-{file_name}.sh > ${{PROJ_HOME}}/job-out-{file_name}/output-serial.out
 fi
 sleep 2
 """)
@@ -212,35 +211,44 @@ report.write(f"""#!/bin/bash
 #SBATCH --output=./report-{file_name}-%j.out
 
 ## Collect jobs with error
-for i in `ls ${{PROJ_HOME}}/job_out_{file_name}/{file_name}-*.out`; do
+for i in `ls ${{PROJ_HOME}}/job-out-{file_name}/{file_name}-*.out`; do
     if grep -Piq "ERROR|failed" $i; then
-        echo $i | grep -Po "(?<=job_out_{file_name}/).*(?=_.*.out$)" >> ${{PROJ_HOME}}/job_out_{file_name}/failed-temp.txt
+        echo $i | grep -Po "(?<=job-out-{file_name}/).*(?=-.*.out$)" >> ${{PROJ_HOME}}/job-out-{file_name}/failed-temp.txt
     fi
 done
 
 if [ `jq ."job_number_max" config.json` -gt 1 ]; then
 ## Collecting failed and timeout Slurm jobs
-sacct -XP --state F,TO --noheader --starttime {time_ptr} --format JobName | grep "{file_name}" >> ${{PROJ_HOME}}/job_out_{file_name}/failed-temp.txt
+sacct -XP --state F,TO --noheader --starttime {time_ptr} --format JobName | grep "{file_name}" >> ${{PROJ_HOME}}/job-out-{file_name}/failed-temp.txt
 fi
 
-sleep 1
-sort ${{PROJ_HOME}}/job_out_{file_name}/failed-temp.txt | uniq > ${{PROJ_HOME}}/job_out_{file_name}/failed.txt
-rm ${{PROJ_HOME}}/job_out_{file_name}/failed-temp.txt
-
 ## Collect warnings
-grep -i "warning" ${{PROJ_HOME}}/job_out_{file_name}/output_*.out > ${{PROJ_HOME}}/job_out_{file_name}/warning.txt
+grep -i "warning" ${{PROJ_HOME}}/job-out-{file_name}/output-*.out > ${{PROJ_HOME}}/job-out-{file_name}/warning.txt
+sleep 1
+
+## Collect jobs with warning
+for w in $(cat ${{PROJ_HOME}}/job-out-{file_name}/warning.txt | grep input | grep -Po "(?<=batch).*(?=-)"); do
+echo {file_name}-$w >> ${{PROJ_HOME}}/job-out-{file_name}/failed-temp.txt
+done
+sleep 1
+
+if [ -f ${{PROJ_HOME}}/job-out-{file_name}/failed-temp.txt ]; then
+sort ${{PROJ_HOME}}/job-out-{file_name}/failed-temp.txt | uniq > ${{PROJ_HOME}}/job-out-{file_name}/failed.txt
+rm ${{PROJ_HOME}}/job-out-{file_name}/failed-temp.txt
+else touch ${{PROJ_HOME}}/job-out-{file_name}/failed.txt
+fi
 sleep 1
 
 echo "-----------------------------------------------------------------------------------
 Job(s) start time: {time_ptr}
 Number of queries: {num_query}
-Number of jobs: `ls ${{PROJ_HOME}}/job_out_{file_name}/*.out | wc -l`
-Number of warnings: `cat ${{PROJ_HOME}}/job_out_{file_name}/warning.txt | wc -l`
-Number of failed jobs: `cat ${{PROJ_HOME}}/job_out_{file_name}/failed.txt | wc -l`
+Number of jobs: `ls ${{PROJ_HOME}}/job-out-{file_name}/*.out | wc -l`
+Number of warnings: `cat ${{PROJ_HOME}}/job-out-{file_name}/warning.txt | wc -l`
+Number of failed jobs: `cat ${{PROJ_HOME}}/job-out-{file_name}/failed.txt | wc -l`
 
 Find name of jobs with a warning or failure in:
-    - ./job_out_{file_name}/warning.txt
-    - ./job_out_{file_name}/failed.txt
+    - ./job-out-{file_name}/warning.txt
+    - ./job-out-{file_name}/failed.txt
 
 Find the CSV and JSON outputs in (when jobs done with no failure):
     - ./outputs/{file_name}-{time_pt}.csv
