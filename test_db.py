@@ -22,7 +22,7 @@ if q_type == 'coordinate':
     ## Input
     lat_in = input('Insert lat: ').strip()
     lon_in = input('Insert lon: ').strip()
-    unit_id = (str(p['lat']).replace('.','')[::2] + str(p['lon']).replace('.','').replace('-','')[::2])[:8]
+    unit_id = (str(lat_in).replace('.','')[::2] + str(lon_in).replace('.','').replace('-','')[::2])[:8]
     
     ## Query
     if unit_id in database.keys():
