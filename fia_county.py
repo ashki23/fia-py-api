@@ -92,7 +92,7 @@ for i in range(max_job):
 #SBATCH --mem=1G
 #SBATCH --partition={config['partition']}
 #SBATCH --time={config['job_time_hr']}:00:00
-#SBATCH --output=./job-out-state-county/state-county-{i}_%j.out
+#SBATCH --output=./job-out-state-county/state-county-{i}-%j.out
         """)
     
         rnum = 1

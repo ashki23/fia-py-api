@@ -19,8 +19,10 @@ done
 
 ## For serial mode
 if [ -z $(which sbatch) ]; then
-. ${FIA}/job-${query_name}-0.sh
-. ${PROJ_HOME}/job-${query_name}.sh
+mv ${PROJ_HOME}/job-out-${query_name}/*.* ${PROJ_HOME}/job-out-${query_name}/archive/rebatch-${dtim}
+. ${FIA}/job-${query_name}-0.sh > ${PROJ_HOME}/job-out-${query_name}/${query_name}-0.out
+. ${PROJ_HOME}/job-${query_name}.sh > ${PROJ_HOME}/job-out-${query_name}/output-serial.out
+. ${PROJ_HOME}/report-${query_name}.sh > ${PROJ_HOME}/report-${query_name}-serial-rebatch.out
 return
 fi
 
