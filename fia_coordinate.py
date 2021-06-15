@@ -223,6 +223,9 @@ report.write(f"""#!/bin/bash
 #SBATCH --partition={config['partition']}
 #SBATCH --output=./report-{file_name}-%j.out
 
+## Set env variables
+source environment.sh
+
 ## Collect jobs with error
 for i in `ls ${{PROJ_HOME}}/job-out-{file_name}/{file_name}-*.out`; do
     if grep -Piq "ERROR|failed" $i; then
@@ -232,10 +235,14 @@ done
 
 if [ `jq ."job_number_max" config.json` -gt 1 ]; then
 ## Collecting failed and timeout Slurm jobs
-sacct -XP --state F,TO --noheader --starttime {time_ptr} --format JobName | grep "{file_name}" >> ${{PROJ_HOME}}/job-out-{file_name}/failed-temp.txt
+sacct -XP --state F,TO --noheader --starttime {time_ptr} --format JobName | grep "{file_name}-" >> ${{PROJ_HOME}}/job-out-{file_name}/failed-temp.txt
 fi
 
 ## Collect warnings
+if [ ! -f ${{PROJ_HOME}}/job-out-{file_name}/output-*.out ]; then
+. ${{PROJ_HOME}}/job-{file_name}.sh > ${{PROJ_HOME}}/job-out-{file_name}/output-msc.out
+sleep 1
+fi
 grep -i "warning" ${{PROJ_HOME}}/job-out-{file_name}/output-*.out > ${{PROJ_HOME}}/job-out-{file_name}/warning.txt
 sleep 1
 
