@@ -42,8 +42,8 @@ The following shows configurable items and template values:
 - **attribute_cd:** list of FIA forest attributes code. For a single code use a singleton list *e.g. [7]*
 - **tolerance:** a binary variable of 0 or 1. Set 1 to use the closest available [FIA survey year](https://apps.fs.usda.gov/fia/datamart/recent_load_history.html) to the listed years, if the listed year is not available
 - **job_number_max:** max number of jobs that can be submitted at the same time. Use 1 for running in serial
-- **job_time_hr:** estimated hours that each job might takes (equivalent to `--time` slurm option). Not required to change for running in serial
-- **partition:** name of the selected partition in the cluster (equivalent to `--partition` slurm option). Not required to change for running in serial
+- **job_time_hr:** estimated hours that each job might takes (equivalent to `--time` Slurm option). Not required to change for running in serial
+- **partition:** name of the selected partition in the cluster (equivalent to `--partition` Slurm option). Not required to change for running in serial
 - **query_type:** type of the FIA query i.e. state, county, and/or coordinate
 
 ## Workflow
@@ -51,9 +51,58 @@ The workflow includes the following steps:
 
 - Setup the environment
 - Download required data by Bash
-- Download FIA dataset and generate outputs by Python
+- Download FIA dataset by Bash, Python and Slurm 
+- Generate outputs and reports by Python
 
-You can find the workflow in `batch_file.sh`. After updating `config.json`, run `sbatch batch_file.sh` in a cluster or `source batch_file.sh` in a Unix Shell to submit jobs and generate outputs. When jobs are done, see the report of submitted jobs in `report-<query type>-*.out` and use `python test_db.py` to extract the collected information for a coordinate, state or county. The collected databases are avalable under `./output` directory in JSON and CSV formats.
+You can find the workflow in `batch_file.sh`. 
+
+## Usage
+After updating `config.json`, run the following to generate outputs:
+
+```bash
+## with Slurm
+sbatch batch_file.sh
+
+## In serial (without Slurm)
+source batch_file.sh
+```
+
+When jobs are done, see the report of submitted jobs in `report-<query-type>-*.out` and use `python test_db.py` to extract the collected information for a coordinate, state or county. The application will generate the report when jobs finished, but in the case that the report is not created because of the job failures use the following to generate the report:
+
+```bash
+## With Slurm
+sbatch report-<query-type>.sh
+
+## In serial (without Slurm)
+source report-<query-type>.sh > ./report-<query-type>-serial.out
+```
+
+You can Find name of jobs with a warning or failure in:
+```bash
+./job-out-<query-type>/warning.txt
+./job-out-<query-type>/failed.txt
+```
+
+And the collected databases are avalable under `./output` directory in JSON and CSV formats:
+```bash
+./outputs/<query-type>-panel-<date-time>.csv
+./outputs/<query-type>-<date-time>.csv
+./outputs/<query-type>-<date-time>.json
+```
+
+Note that failures can be related to:
+- Unavailability of EVALIDator and FIADB (check FIA alerts at https://www.fia.fs.fed.us/tools-data/)
+- Download failure
+- Slurm job failure
+- Invalid configs (review `config.json`)
+- Invalid coordinates (review `coordinate.csv`)
+
+If failures are related to EVALIDator servers, downloading JSON files or Slurm jobs, consider to resubmit the failed jobs by running:
+```bash
+source rebatch_file.sh
+```
+
+Otherwise, modify config file and/or input files and resubmit the `batch_file.sh`.
 
 ---
 <div align="center">
