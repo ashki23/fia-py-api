@@ -39,7 +39,7 @@ The following shows configurable items and template values:
 **Metadata** - `config.json` includes:
 - **year:** list of years. For a single year use a singleton list *e.g. [2017]*
 - **state:** list of states. Use `["ALL"]` to include all states in the data. For a single state use a singleton list *e.g. ["MO"]*
-- **attribute_cd:** list of FIA forest attributes code. For a single code use a singleton list *e.g. [7]*
+- **attribute_cd:** list of FIA forest attributes code (find them in Appendix O in the [FIA User Guide](https://www.fia.fs.fed.us/library/database-documentation/current/ver80/FIADB%20User%20Guide%20P2_8-0.pdf)). For a single code use a singleton list *e.g. [7]*
 - **tolerance:** a binary variable of 0 or 1. Set 1 to use the closest available [FIA survey year](https://apps.fs.usda.gov/fia/datamart/recent_load_history.html) to the listed years, if the listed year is not available
 - **job_number_max:** max number of jobs that can be submitted at the same time. Use 1 for running in serial
 - **job_time_hr:** estimated hours that each job might takes (equivalent to `--time` Slurm option). Not required to change for running in serial
@@ -51,10 +51,10 @@ The workflow includes the following steps:
 
 - Setup the environment
 - Download required data by Bash
-- Download FIA dataset by Bash, Python and Slurm 
+- Download FIA dataset by Bash, Python and Slurm
 - Generate outputs and reports by Python
 
-You can find the workflow in `batch_file.sh`. 
+You can find the workflow in `batch_file.sh`.
 
 ## Usage
 After updating `config.json`, run the following to generate outputs:
