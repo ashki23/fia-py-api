@@ -101,7 +101,7 @@ for i in range(max_job):
             batch.write(f"""
 echo "----------------------- {q['att_cd']}-{q['year']}-{q['st']} | {rnum} out of {len(select_qr)}"
 if [ ! -f {file_path}-{q['yr']}.json ]; then
-wget -c --tries=2 --random-wait "https://apps.fs.usda.gov/Evalidator/rest/Evalidator/fullreport?reptype=State&lat=0&lon=0&radius=0&snum={q['att']}&sdenom=No denominator - just produce estimates&wc={q['cd_yr']}&pselected=None&rselected=County code and name&cselected=None&ptime=Current&rtime=Current&ctime=Current&wf=&wnum=&wnumdenom=&FIAorRPA=FIADEF&outputFormat=JSON&estOnly=Y&schemaName=FS_FIADB." -O {file_path}-{q['yr']}.json
+wget --tries=3 --timeout=180 --random-wait "https://apps.fs.usda.gov/Evalidator/rest/Evalidator/fullreport?reptype=State&lat=0&lon=0&radius=0&snum={q['att']}&sdenom=No denominator - just produce estimates&wc={q['cd_yr']}&pselected=None&rselected=County code and name&cselected=None&ptime=Current&rtime=Current&ctime=Current&wf=&wnum=&wnumdenom=&FIAorRPA=FIADEF&outputFormat=JSON&estOnly=Y&schemaName=FS_FIADB." -O {file_path}-{q['yr']}.json
 fi
             """)
             rnum += 1
@@ -139,7 +139,11 @@ for i in json_files:
         with open(i) as jf:
             js_data = json.load(jf)
     except json.decoder.JSONDecodeError:
-        print(f"Warning: {{i}} is not a vaild JSON input.")
+        jf_in = open(i).read()
+        if re.match("Estimate not available", jf_in):
+            print(f"Warning: {{i}} estimate not available.")
+        else:
+            print(f"Warning: {{i}} is not a vaild JSON input.")
         continue
 
     n = os.path.basename(i)

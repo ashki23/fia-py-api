@@ -31,7 +31,7 @@ rm ${PROJ_HOME}/jobid-${query_name}-rebatch.log
 
 ## For parallel: resubmit the failed jobs
 for j in $(cat ${PROJ_HOME}/job-out-${query_name}/failed.txt); do
-mv ${PROJ_HOME}/job-out-${query_name}/${j}*.out ${PROJ_HOME}/job-out-${query_name}/archive/rebatch-${dtim}
+mv ${PROJ_HOME}/job-out-${query_name}/${j}-*.out ${PROJ_HOME}/job-out-${query_name}/archive/rebatch-${dtim}
 JID=$(sbatch --parsable ${FIA}/job-${j}.sh)
 echo ${JID} >> ${PROJ_HOME}/jobid-${query_name}-rebatch.log
 done
