@@ -52,7 +52,7 @@ for st in input_state:
     wget -c -nv --tries=2 https://apps.fs.usda.gov/fia/datamart/CSV/{st}_POP_STRATUM.csv -P ./fia_data/survey
     fi
     awk -F , '{{print $4}}' ./fia_data/survey/{st}_POP_STRATUM.csv | grep ".*01$" | sort | uniq
-    """).read()[:-1].split('\n')
+    """).read().strip().split('\n')
     
     if len(invyr_id[0]) == 6:
         in_yr = [x[2:-2] for x in invyr_id]
@@ -155,6 +155,7 @@ for i in json_files:
             print(f"Warning: {{i}} estimate not available.")
         else:
             print(f"Warning: {{i}} is not a vaild JSON input.")
+        jf_in.close()
         continue
 
     n = os.path.basename(i)
