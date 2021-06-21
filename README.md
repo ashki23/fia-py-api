@@ -17,9 +17,18 @@ The workflow in this repository is designed to run in both parallel and serial. 
 ## Abstract
 The Forest Inventory and Analysis (FIA) Program of the US Forest Service provides the information needed to assess America's forests. Many researchers rely on forest attribute estimations from the FIA program to evaluate forest conditions. US Forest Service provides multiple methods to use FIA database (FIADB) including EVALIDator and FIA Data Mart. The FIA Data Mart allows users to download raw data files and SQLite databases. Among the available formats, only SQLite database is an option for a large number of queries. To use SQLite database, users require to download entire database (10GB) and establish a local SQLite server. Beside the complexity of the query commands, the local database size growing very fast by implementing more queries. Also, Forest Service update FIADB regularly and for access to new releases users need to update the local server periodically.
 
-On the other hand, EVALIDator relies on the HTML queries and allows users to produce a large variety of population estimates through a web-application with the lowest level of difficulty. However, EVALIDator provides a single query at the time and it makes the web-application not suitable for collecting a large FIA data. The Python API uses the JSON query system to collect large data from FIADB in parallel. It uses EVALIDator to access FIADB, but it can handle large number of queries at a time.
+On the other hand, EVALIDator relies on the HTML queries and allows users to produce a large variety of population estimates through a web-application with the lowest level of difficulty. However, EVALIDator provides a single query at the time and it makes the web-application not suitable for collecting a large FIA data. The Python API uses FIADB API to bypass the EVALIDator’s GUI and collect JSON queries from FIADB. It uses Slurm jobs to communicate with FIADB in parallel to collect large number of queries at a time.
 
-In this project we used Python and Slurm workload manager to generate numerous parallel workers and distribute them across the cluster. The API is designed to scale up the query process such that by increasing processing elements (PE) the process expected to speedup linearly. The API can be set up and configured to be run on a single core computer or in a cluster for any given year, state, coordinate, and forest attribute. It can also search for the closest available FIA survey year to each query and provides a real-time access to most recent releases FIADB. After collecting requested information, outputs are stored on CSV and JSON files and can be used by other scientific software.
+In this project we used Python and Slurm workload manager to generate numerous parallel workers and distribute them across the cluster. The API is designed to scale up the query process such that by increasing processing elements (PE) the process expected to speedup linearly. The API can be set up and configured to be run on a single core computer or in a cluster for any given year, state, coordinate, and forest attribute. It can also search for the closest available FIA survey year to each query and provides a real-time access to most recent releases FIADB. After collecting requested information, outputs are stored on CSV and JSON files and can be used by other scientific software. The following shows features of the Python API:
+
+- **Scalable**. It can be run on a single core computer or in a cluster.
+- **Configurable**. It can be run for any given year, state, coordinate, and forest attribute.
+- **Real-time access**. Access to the most recent releases of large variety of population estimates from FIA. The API can search for the closest available FIA survey year. 
+- **Explanatory reports**. Generating reports that show failed queries and warnings.
+- **Job completion**. Ability to resubmit the failed jobs to collect only the missing information.
+- **JSON queries**. It can significantly reduce size of the collecting information from the FIADB. 
+- **CSV and JSON outputs**. That can be used by other scientific software 
+- **Easy to work with**. The API designed for collecting quires in parallel with minimum difficulty.
 
 ## Configurations
 The following shows configurable items and template values:
@@ -67,7 +76,7 @@ sbatch batch_file.sh
 source batch_file.sh
 ```
 
-When jobs are done, see the report of submitted jobs in `report-<query-type>-*.out` and use `python test_db.py` to extract the collected information for a coordinate, state or county. The application will generate the report when jobs finished, but in the case that the report is not created because of the job failures use the following to generate the report:
+When jobs are done, see the report of submitted jobs in `report-<query-type>-*.out` and use `python test_db.py` to extract the collected information for a coordinate, state or county. The application will generate the report when jobs finished, but in the case that the report is not created because of the job failures, use the following to generate the report:
 
 ```bash
 ## With Slurm
@@ -77,7 +86,7 @@ sbatch report-<query-type>.sh
 source report-<query-type>.sh > ./report-<query-type>-serial.out
 ```
 
-You can Find name of jobs with a warning or failure in:
+You can Find warnings and failed jobs in:
 ```bash
 ./job-out-<query-type>/warning.txt
 ./job-out-<query-type>/failed.txt
@@ -90,14 +99,14 @@ And the collected databases are avalable under `./output` directory in JSON and 
 ./outputs/<query-type>-<date-time>.json
 ```
 
-Note that failures can be related to:
-- Unavailability of EVALIDator and FIADB (check FIA alerts at https://www.fia.fs.fed.us/tools-data/)
+Note that job failures can be related to:
+- Unavailability of FIADB (check FIA alerts at https://www.fia.fs.fed.us/tools-data/)
 - Download failure
 - Slurm job failure
 - Invalid configs (review `config.json`)
 - Invalid coordinates (review `coordinate.csv`)
 
-If failures are related to EVALIDator servers, downloading JSON files or Slurm jobs, consider to resubmit the failed jobs by running:
+If failures are related to FIA servers, downloading JSON files or Slurm jobs, consider to resubmit the failed jobs by running:
 ```bash
 source rebatch_file.sh
 ```
