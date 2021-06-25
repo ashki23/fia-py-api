@@ -8,8 +8,9 @@ fi
 
 ## Set env variables
 source environment.sh
-echo ============ Rebatch time: $(date +"%Y-%m-%d-%H:%M")
+rbtim=$(date +"%Y-%m-%d-%H:%M")
 dtim=$(date +"%Y%m-%d%H%M")
+echo ============ Rebatch time: ${rbtim}
 install -dvp  ${PROJ_HOME}/job-out-${query_name}/archive/rebatch-${dtim}
 
 ## Remove invalid json files
@@ -46,4 +47,4 @@ sleep 2
 mv ${PROJ_HOME}/job-out-${query_name}/failed.txt ${PROJ_HOME}/job-out-${query_name}/archive/rebatch-${dtim}
 mv ${PROJ_HOME}/job-out-${query_name}/warning.txt ${PROJ_HOME}/job-out-${query_name}/archive/rebatch-${dtim}
 mv ${PROJ_HOME}/job-out-${query_name}/output-*.out ${PROJ_HOME}/job-out-${query_name}/archive/rebatch-${dtim}
-sbatch --dependency=afterany:$(echo ${JID}) ${PROJ_HOME}/report-${query_name}.sh
+sbatch --dependency=afterany:$(echo ${JID}) ${PROJ_HOME}/report-${query_name}.sh ${rbtim}

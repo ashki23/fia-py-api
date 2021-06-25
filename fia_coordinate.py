@@ -240,7 +240,7 @@ done
 
 if [ `jq ."job_number_max" config.json` -gt 1 ]; then
 ## Collecting failed and timeout Slurm jobs
-sacct -XP --state F,TO --noheader --starttime {time_ptr} --format JobName | grep "{file_name}-" >> ${{PROJ_HOME}}/job-out-{file_name}/failed-temp.txt
+sacct -XP --state F,TO --noheader --starttime $1 --format JobName | grep "{file_name}-" >> ${{PROJ_HOME}}/job-out-{file_name}/failed-temp.txt
 fi
 
 ## Collect warnings
@@ -297,7 +297,7 @@ os.system(f"""
 sleep 2
 if [ {max_job} -gt 1 ]; then
 JOBID=$(tail -qn 1 ${{PROJ_HOME}}/jobid-{file_name}.log)
-sbatch --dependency=afterany:$(echo ${{JOBID}}) ${{PROJ_HOME}}/report-{file_name}.sh
+sbatch --dependency=afterany:$(echo ${{JOBID}}) ${{PROJ_HOME}}/report-{file_name}.sh "{time_ptr}"
 else . ${{PROJ_HOME}}/report-{file_name}.sh > ${{PROJ_HOME}}/report-{file_name}-serial.out
 fi
 """)
