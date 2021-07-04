@@ -73,17 +73,19 @@ After updating `config.json`, run the following to generate outputs:
 sbatch batch_file.sh
 
 ## In serial (without Slurm)
-source batch_file.sh
+. ./batch_file.sh
 ```
 
 When jobs are done, see the report of submitted jobs in `report-<query-type>-*.out` and use `python test_db.py` to extract the collected information for a coordinate, state or county. The application will generate the report when jobs finished, but in the case that the report is not created because of the job failures, use the following to generate the report:
 
 ```bash
 ## With Slurm
+. ./environment.sh
 sbatch report-<query-type>.sh
 
 ## In serial (without Slurm)
-source report-<query-type>.sh > ./report-<query-type>-serial.out
+. ./environment.sh
+. ./report-<query-type>.sh > ./report-<query-type>-serial.out
 ```
 
 You can Find warnings and failed jobs in:
@@ -108,7 +110,7 @@ Note that job failures can be related to:
 
 If failures are related to FIA servers, downloading JSON files or Slurm jobs, consider to resubmit the failed jobs by running:
 ```bash
-source rebatch_file.sh
+. ./rebatch_file.sh
 ```
 
 Otherwise, modify config file and/or input files and resubmit the `batch_file.sh`.

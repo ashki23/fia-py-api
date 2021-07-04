@@ -24,6 +24,7 @@ with open('./state_codes.csv', 'r') as cd:
 ## Select states from the config
 state_cd = prep_data.state_config(state_cd,config)
 input_state = list(state_cd.keys())
+if 'DC' in input_state: input_state.remove('DC')
 
 ## Create a new directory and and remove log files
 os.system(f"""
@@ -67,9 +68,9 @@ for att_cd in config['attribute_cd']:
             if tol == 0:
                 if str(year) in st_invyr[cd]:
                     yr = year
-                    cd_yr = [f"{cd}{yr}"]
+                    cd_yr = f"{cd}{yr}"
                 else:
-                    print(f"\n-------- Warning: Estimate not available for state {st} for year {year} --------\n")
+                    print(f"Warning: Estimate not available for state {st} for year {year}")
                     continue
             else:
                 diff = [abs(int(x) - year) for x in st_invyr[cd]]
@@ -94,7 +95,7 @@ for i in range(max_job):
 #SBATCH --time={config['job_time_hr']}:00:00
 #SBATCH --output=./job-out-state-county/state-county-{i}-%j.out
         """)
-    
+        
         rnum = 1
         for q in select_qr:
             file_path = f"${{FIA}}/json/state-county-{time_pt}/{q['att_cd']}-{q['year']}-{q['st']}-batch{i}"
@@ -106,7 +107,7 @@ fi
             """)
             rnum += 1
         batch.close()
-    
+        
         ## Submit the batch file
         os.system(f"""
         if [ {max_job} -gt 1 ]; then
@@ -238,9 +239,6 @@ report.write(f"""#!/bin/bash
 #SBATCH --mem=4G
 #SBATCH --partition={config['partition']}
 #SBATCH --output=./report-state-county-%j.out
-
-## Set env variables
-source environment.sh
 
 ## Collect jobs with error
 for i in `ls ${{PROJ_HOME}}/job-out-state-county/state-county-*.out`; do

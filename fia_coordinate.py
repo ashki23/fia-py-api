@@ -44,6 +44,7 @@ for r in input_data:
     input_state.extend(r['neighbors'])
 
 input_state = list(set(input_state))
+if 'DC' in input_state: input_state.remove('DC')
 
 st_invyr = {}
 for st in input_state:
@@ -69,13 +70,14 @@ for att_cd in config['attribute_cd']:
     for year in config['year']:
         for l in input_data:
             query_cd = [l['state_cd']] + l['neighbors_cd']
+            if '11' in query_cd: query_cd.remove('11') # DC code is 11
             
             if tol == 0:
-                if str(year) in st_invyr[l['state_cd']]:
+                if all(str(year) in st_invyr[x] for x in query_cd):
                     yr = year
                     cd_yr = [f"{x}{yr}" for x in query_cd]
                 else:
-                    print(f"\n-------- Warning: Estimate not available for state {l['state']} for year {year} --------\n")
+                    print(f"Warning: Estimate not available for unit id {l['unit_id']} for year {year}.")
                     continue
             else:
                 cd_yr = []
@@ -105,7 +107,7 @@ for i in range(max_job):
 #SBATCH --time={config['job_time_hr']}:00:00
 #SBATCH --output=./job-out-{file_name}/{file_name}-{i}-%j.out
         """)
-    
+        
         rnum = 1
         for q in select_qr:
             file_path = f"${{FIA}}/json/{file_name}-{time_pt}/{q['att_cd']}-{q['year']}-id{q['unit_id']}-batch{i}"
@@ -227,9 +229,6 @@ report.write(f"""#!/bin/bash
 #SBATCH --mem=4G
 #SBATCH --partition={config['partition']}
 #SBATCH --output=./report-{file_name}-%j.out
-
-## Set env variables
-source environment.sh
 
 ## Collect jobs with error
 for i in `ls ${{PROJ_HOME}}/job-out-{file_name}/{file_name}-*.out`; do
