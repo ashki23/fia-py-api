@@ -4,6 +4,7 @@ other_data/
 fia_data/
 outputs/
 job_out*/
+shape*/
 miniconda/
 .conda/
 .cache/

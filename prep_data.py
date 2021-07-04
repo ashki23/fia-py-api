@@ -4,8 +4,14 @@ import os
 import sys
 import csv
 import json
+import glob
+import math
+import fiona
+import shapely
 import geocoder
 import collections
+from shapely.geometry import Point, Polygon
+from shapely.ops import nearest_points
 
 def csv_dict(csv_file):
     csv_data = csv.reader(csv_file)
@@ -112,6 +118,37 @@ def list_dict_panel(list_dict,keys,config,csv_output):
                     i[ay] = 'NA'
             fcsv.writerow(row + [y] + [i[x] for x in att_yr])
 
+def haversine(point1, point2): # point = (x,y) = (lon,lat)
+    """
+    Calculate the great circle distance between two points
+    on the earth (specified in decimal degrees)
+    """
+    # convert decimal degrees to radians
+    lon1, lat1, lon2, lat2 = map(math.radians,[point1[0], point1[1], point2[0], point2[1]])
+    
+    # haversine formula
+    dlon = lon2 - lon1
+    dlat = lat2 - lat1
+    a = math.sin(dlat/2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon/2)**2
+    c = 2 * math.asin(math.sqrt(a))
+    r = 3956 # Radius of earth in mile. Use 6371 for km
+    return c * r
+
+def dist_point_polyg(points,shape_file):
+    dist_dict = collections.defaultdict(dict)
+    for i in points:
+        unit_id = i["unit_id"]
+        point_ = Point(float(i['lon']),float(i['lat']))
+        for j in shape_file:
+            state_name = j['properties']['NAME']
+            polyg = shapely.geometry.shape(j['geometry'])
+            nearest_pt, pt = nearest_points(polyg, point_)
+            nearest_coord = (nearest_pt.x,nearest_pt.y)
+            pt_coord = (pt.x, pt.y)
+            dist_mile = haversine(nearest_coord,pt_coord)
+            dist_dict[unit_id][state_name] = dist_mile
+    return dist_dict
+
 if __name__=='__main__':
     ## Read config
     config = json.load(open(sys.argv[1]))
@@ -145,20 +182,6 @@ if __name__=='__main__':
     with open('./state_abb.csv', 'r') as ab:
         state_abb = csv_dict(ab)
     
-    ## State neighbors and codes
-    with open('./neighbor_state.csv', 'r') as nd:
-        ne_data = csv_list_tuple(nd) 
-    
-    neighbor_state = collections.defaultdict(list)
-    for i,j in ne_data:
-        neighbor_state[i].append(j)
-        neighbor_state[j].append(i)
-    
-    neighbor_cd = collections.defaultdict(list)
-    for i,j in ne_data:
-        neighbor_cd[i].append(state_cd[j])
-        neighbor_cd[j].append(state_cd[i])
-    
     ## Coordinates
     if "coordinate" in config['query_type']:
         
@@ -175,8 +198,15 @@ if __name__=='__main__':
             p['state_name'] = geocoder.osm(f"{str(p['lat'])}, {str(p['lon'])}", reverse = True).json['state']
             p['state'] = state_abb[p['state_name']]
             p['state_cd'] = state_cd[p['state']]
-            p['neighbors'] =  neighbor_state[p['state']]
-            p['neighbors_cd'] =  neighbor_cd[p['state']]
+        
+        ### Read state shape file and find nearest distance from each point to each state
+        with fiona.open(glob.glob('./shape_state/*state*.shp').pop()) as shp:
+            dist_data = dist_point_polyg(xydata,shp)
+        
+        for p in xydata:
+            p['neighbors_name'] = [x for x in dist_data[p['unit_id']].keys() if dist_data[p['unit_id']][x] < float(p['radius']) and dist_data[p['unit_id']][x] > 0]
+            p['neighbors'] = [state_abb[x] for x in p['neighbors_name']]
+            p['neighbors_cd'] = [state_cd[x] for x in p['neighbors']]
         
         ### JSON output of unique coordinates
         xydata_uniq = select_uniq_id(xydata,'unit_id')
@@ -187,4 +217,3 @@ if __name__=='__main__':
         keys = list(header)
         with open ('./coordinate_id.csv', 'w') as fc:
             list_dict_csv(xydata,keys,fc)
-        

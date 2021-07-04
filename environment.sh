@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -x
 
 export PROJ_HOME=${PWD}
 export OUTPUT=${PWD}/outputs
@@ -24,7 +24,7 @@ echo ============ Create Conda envs ============= $(hostname) $(date)
 
 ## Create local environments
 if [ ! -d api_py_env ]; then
-## Including: python jq geocoder
+## Including: python jq shapely fiona
 conda create --yes --prefix ./api_py_env --file ./api_py_env.txt
 conda activate ./api_py_env
 pip install geocoder
