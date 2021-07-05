@@ -32,6 +32,7 @@ In this project we used Python and Slurm workload manager to generate numerous p
 
 ## Configurations
 The following shows configurable items and template values:
+
 ```json
 {
     "year" : [2017,2019],
@@ -81,7 +82,7 @@ When jobs are done, see the report of submitted jobs in `report-<query-type>-*.o
 ```bash
 ## With Slurm
 . ./environment.sh
-sbatch report-<query-type>.sh
+sbatch report-<query-type>.sh `cat time_<query-type>`
 
 ## In serial (without Slurm)
 . ./environment.sh
@@ -89,12 +90,14 @@ sbatch report-<query-type>.sh
 ```
 
 You can Find warnings and failed jobs in:
+
 ```bash
 ./job-out-<query-type>/warning.txt
 ./job-out-<query-type>/failed.txt
 ```
 
 And the collected databases are avalable under `./output` directory in JSON and CSV formats:
+
 ```bash
 ./outputs/<query-type>-panel-<date-time>.csv
 ./outputs/<query-type>-<date-time>.csv
@@ -109,6 +112,7 @@ Note that job failures can be related to:
 - Invalid coordinates (review `coordinate.csv`)
 
 If failures are related to FIA servers, downloading JSON files or Slurm jobs, consider to resubmit the failed jobs by running:
+
 ```bash
 . ./rebatch_file.sh
 ```

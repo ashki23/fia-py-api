@@ -145,7 +145,6 @@ for i in json_files:
             print(f"Warning: {{i}} estimate not available.")
         else:
             print(f"Warning: {{i}} is not a vaild JSON input.")
-        jf_in.close()
         continue
 
     n = os.path.basename(i)
@@ -240,9 +239,12 @@ report.write(f"""#!/bin/bash
 #SBATCH --partition={config['partition']}
 #SBATCH --output=./report-state-county-%j.out
 
+## Record the time that jobs are started
+echo {time_ptr} > ./time_state_county
+
 ## Collect jobs with error
 for i in `ls ${{PROJ_HOME}}/job-out-state-county/state-county-*.out`; do
-    if grep -Piq "ERROR|failed" $i; then
+    if grep -Piq "giving up|proxy error|failed" $i; then
         echo $i | grep -Po "(?<=job-out-state-county/).*(?=-.*.out$)" >> ${{PROJ_HOME}}/job-out-state-county/failed-temp.txt
     fi
 done
