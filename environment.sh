@@ -1,4 +1,4 @@
-#!/bin/bash -x
+#!/bin/bash
 
 export PROJ_HOME=${PWD}
 export OUTPUT=${PWD}/outputs
