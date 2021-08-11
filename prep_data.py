@@ -137,7 +137,7 @@ def haversine(point1, point2): # point = (x,y) = (lon,lat)
 def dist_point_polyg(points,shape_file):
     dist_dict = collections.defaultdict(dict)
     for i in points:
-        unit_id = i["unit_id"]
+        unit_id = i['unit_id']
         point_ = Point(float(i['lon']),float(i['lat']))
         for j in shape_file:
             state_name = j['properties']['NAME']
@@ -204,7 +204,8 @@ if __name__=='__main__':
             dist_data = dist_point_polyg(xydata,shp)
         
         for p in xydata:
-            p['neighbors_name'] = [x for x in dist_data[p['unit_id']].keys() if dist_data[p['unit_id']][x] < float(p['radius']) and dist_data[p['unit_id']][x] > 0]
+            p['neighbors_name'] = [x for x in dist_data[p['unit_id']].keys() if dist_data[p['unit_id']][x] < float(p['radius'])]
+            p['neighbors_name'].remove(p['state_name'])
             p['neighbors'] = [state_abb[x] for x in p['neighbors_name']]
             p['neighbors_cd'] = [state_cd[x] for x in p['neighbors']]
         

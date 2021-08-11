@@ -286,7 +286,7 @@ Find name of jobs with a warning or failure in:
     - ./job-out-state-county/warning.txt
     - ./job-out-state-county/failed.txt
 
-Find the CSV and JSON outputs in (when jobs done with no failure):
+Find the CSV and JSON outputs in (when jobs are done with no failure):
     - ./outputs/county-{time_pt}.csv
     - ./outputs/county-panel-{time_pt}.csv
     - ./outputs/county-{time_pt}.json
@@ -295,13 +295,13 @@ Find the CSV and JSON outputs in (when jobs done with no failure):
     - ./outputs/state-{time_pt}.json
 
 Failures can be related to:
-    - Unavailability of EVALIDator and the FIADB (check FIA alerts at https://www.fia.fs.fed.us/tools-data/)
+    - FIADB issues (check FIA alerts at https://www.fia.fs.fed.us/tools-data/)
     - Download failure
-    - Slurm job failure
+    - Slurm jobs failure
     - Invalid configs (review config.json)
     - Invalid coordinates (review coordinate.csv)
 
-If failures are related to EVALIDator servers, downloading JSON file or Slurm jobs, consider to run 'rebatch_file.sh' file to resubmit the failed jobs. Otherwise, modify config file and/or input files and resubmit the 'batch_file.sh'.
+If failures are related to FIADB servers, downloading JSON files or Slurm jobs, consider to run 'source rebatch_file.sh' to resubmit the failed jobs. Otherwise, modify config file and/or input files and resubmit the 'batch_file.sh'.
 -----------------------------------------------------------------------------------"
 """)
 report.close()
